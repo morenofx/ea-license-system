@@ -7,6 +7,8 @@
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🤖</text></svg>">
   <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     
@@ -356,6 +358,65 @@
     }
     .tax-total-label { font-size: 14px; color: rgba(255,255,255,0.6); }
     .tax-total-value { font-size: 32px; font-weight: 700; color: #00FF41; margin-top: 8px; }
+    
+    /* MT5 Analyzer Styles */
+    .drop-zone {
+      border: 2px dashed rgba(255,255,255,0.2);
+      border-radius: 16px;
+      padding: 48px;
+      text-align: center;
+      transition: all 0.3s ease;
+      cursor: pointer;
+    }
+    .drop-zone:hover, .drop-zone.active {
+      border-color: #00FF41;
+      background: rgba(0, 255, 65, 0.05);
+    }
+    .mt5-year-card {
+      background: rgba(255,255,255,0.02);
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 12px;
+      padding: 20px;
+      margin-bottom: 20px;
+    }
+    .mt5-year-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 20px;
+      padding-bottom: 15px;
+      border-bottom: 1px solid rgba(255,255,255,0.1);
+    }
+    .mt5-year-badge {
+      font-size: 24px;
+      font-weight: 700;
+      background: linear-gradient(135deg, #00a8ff, #0066ff);
+      padding: 10px 20px;
+      border-radius: 10px;
+    }
+    .mt5-account-row {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+      gap: 10px;
+      padding: 12px;
+      background: rgba(255,255,255,0.02);
+      border-radius: 8px;
+      margin-bottom: 8px;
+    }
+    .mt5-stat { text-align: center; }
+    .mt5-stat .label { font-size: 10px; color: rgba(255,255,255,0.5); text-transform: uppercase; }
+    .mt5-stat .value { font-size: 14px; font-weight: 600; margin-top: 4px; }
+    .mt5-profit { color: #00FF41; }
+    .mt5-loss { color: #ef4444; }
+    .mt5-info-box {
+      padding: 12px;
+      border-radius: 8px;
+      font-size: 12px;
+      margin-top: 12px;
+      background: rgba(0, 168, 255, 0.1);
+      border: 1px solid rgba(0, 168, 255, 0.3);
+      color: #00a8ff;
+    }
   </style>
 </head>
 <body>
@@ -393,6 +454,7 @@
         <div class="tab" data-tab="licenze">🔑 Licenze</div>
         <div class="tab" data-tab="codici">🎟️ Codici</div>
         <div class="tab" data-tab="tasse">💰 Tasse</div>
+        <div class="tab" data-tab="trading">📈 Trading MT5</div>
         <div class="tab" data-tab="export">📥 Export</div>
         <div class="tab" data-tab="settings">⚙️ Impostazioni</div>
         <button class="btn btn-secondary" style="margin-left:auto;" onclick="logout()">Logout</button>
@@ -788,6 +850,74 @@
         <button class="btn btn-primary" onclick="generaReportFiscale()" style="margin-top:20px;width:100%;">
           📄 Genera Report Fiscale per Commercialista
         </button>
+      </div>
+
+      <!-- ==================== TRADING MT5 TAB ==================== -->
+      <div id="tab-trading" class="panel">
+        
+        <div class="card">
+          <div class="card-title">📈 MT5 Fiscal Analyzer</div>
+          <p style="color:rgba(255,255,255,0.6);margin-bottom:20px;">
+            Analizza i report MT5 per calcolare Quadro RT (plusvalenze) e RW (monitoraggio conti esteri)
+          </p>
+          
+          <!-- Drop Zone -->
+          <div id="mt5DropZone" class="drop-zone" onclick="document.getElementById('mt5FileInput').click()">
+            <div style="font-size:48px;margin-bottom:16px;">📊</div>
+            <p>Trascina qui i report MT5 (.xlsx)</p>
+            <p style="color:rgba(255,255,255,0.4);font-size:12px;margin-top:8px;">
+              💡 Genera il report da MT5: Toolbox → Cronologia → Tasto destro → Report → Excel
+            </p>
+          </div>
+          <input type="file" id="mt5FileInput" accept=".xlsx,.xls" multiple style="display:none;" onchange="handleMT5Files(event)">
+        </div>
+        
+        <!-- Impostazioni Valuta -->
+        <div id="mt5CurrencySettings" class="card" style="display:none;">
+          <div class="card-title">💱 Impostazioni Valuta</div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Cambio medio EUR/USD per anno</label>
+              <p style="font-size:11px;color:rgba(255,255,255,0.5);margin-bottom:10px;">
+                Per conti in USD, i valori vengono convertiti in EUR usando questi cambi
+              </p>
+            </div>
+          </div>
+          <div class="form-row" id="mt5ExchangeRates">
+            <!-- Popolato dinamicamente -->
+          </div>
+          <div style="margin-top:10px;">
+            <button class="btn btn-secondary" onclick="resetMT5ExchangeRates()">🔄 Ripristina Default</button>
+          </div>
+        </div>
+        
+        <!-- Risultati -->
+        <div id="mt5Results" style="display:none;">
+          
+          <!-- Riepilogo Totale -->
+          <div class="card" style="background:linear-gradient(135deg, rgba(0,255,136,0.1), rgba(0,168,255,0.1));">
+            <div class="card-title">📊 Riepilogo Totale</div>
+            <div class="stats-grid" id="mt5TotalStats">
+              <!-- Popolato dinamicamente -->
+            </div>
+          </div>
+          
+          <!-- Dettaglio per Anno -->
+          <div id="mt5YearlyResults">
+            <!-- Popolato dinamicamente -->
+          </div>
+          
+          <!-- Azioni -->
+          <div class="card">
+            <div class="card-title">📑 Genera Documenti</div>
+            <div class="btn-group">
+              <button class="btn btn-primary" onclick="exportAllMT5PDF()">📄 Genera Tutti i PDF (RT + RW)</button>
+              <button class="btn btn-secondary" onclick="exportMT5CSV()">📥 Export CSV</button>
+              <button class="btn btn-danger" onclick="clearMT5Data()">🗑️ Cancella Dati</button>
+            </div>
+          </div>
+        </div>
+        
       </div>
 
       <!-- ==================== EXPORT TAB ==================== -->
@@ -2062,6 +2192,677 @@
         });
       }
     };
+    
+    // ==================== MT5 FISCAL ANALYZER ====================
+    
+    // Dati MT5
+    let mt5Accounts = [];
+    let mt5YearlyData = {};
+    
+    // Cambi medi EUR/USD ufficiali (fonte BCE)
+    const defaultExchangeRates = {
+      2021: 1.1827,
+      2022: 1.0530,
+      2023: 1.0813,
+      2024: 1.0813,
+      2025: 1.0850,
+      2026: 1.0900
+    };
+    
+    let mt5ExchangeRates = { ...defaultExchangeRates };
+    
+    // Broker e paesi
+    const brokerCountries = {
+      'ic markets': { code: '036', name: 'Australia' },
+      'icmarkets': { code: '036', name: 'Australia' },
+      'pepperstone': { code: '036', name: 'Australia' },
+      'fpmarkets': { code: '036', name: 'Australia' },
+      'fp markets': { code: '036', name: 'Australia' },
+      'vantage': { code: '036', name: 'Australia' },
+      'fxpro': { code: '196', name: 'Cipro' },
+      'xm': { code: '196', name: 'Cipro' },
+      'exness': { code: '196', name: 'Cipro' },
+      'roboforex': { code: '196', name: 'Cipro' },
+      'fxtm': { code: '196', name: 'Cipro' },
+      'hotforex': { code: '196', name: 'Cipro' },
+      'hfm': { code: '196', name: 'Cipro' },
+      'tickmill': { code: '826', name: 'Regno Unito' },
+      'fxcm': { code: '826', name: 'Regno Unito' },
+      'oanda': { code: '826', name: 'Regno Unito' },
+      'ig': { code: '826', name: 'Regno Unito' },
+      'admirals': { code: '372', name: 'Estonia' },
+      'admiral markets': { code: '372', name: 'Estonia' },
+      'default': { code: '196', name: 'Cipro' }
+    };
+    
+    // Setup drag & drop
+    document.addEventListener('DOMContentLoaded', () => {
+      const dropZone = document.getElementById('mt5DropZone');
+      if (dropZone) {
+        dropZone.addEventListener('dragover', (e) => {
+          e.preventDefault();
+          dropZone.classList.add('active');
+        });
+        dropZone.addEventListener('dragleave', () => {
+          dropZone.classList.remove('active');
+        });
+        dropZone.addEventListener('drop', (e) => {
+          e.preventDefault();
+          dropZone.classList.remove('active');
+          handleMT5Files({ target: { files: e.dataTransfer.files } });
+        });
+      }
+    });
+    
+    async function handleMT5Files(event) {
+      const files = Array.from(event.target.files);
+      const dropZone = document.getElementById('mt5DropZone');
+      
+      dropZone.innerHTML = '<div style="font-size:48px;">⏳</div><p>Elaborazione in corso...</p>';
+      
+      for (const file of files) {
+        if (file.name.match(/\.xlsx?$/i)) {
+          try {
+            const data = await processMT5File(file);
+            mt5Accounts.push(data);
+          } catch (e) {
+            console.error('Errore file:', file.name, e);
+          }
+        }
+      }
+      
+      dropZone.innerHTML = '<div style="font-size:48px;">📁</div><p>Trascina altri file o clicca</p><p style="color:rgba(255,255,255,0.4);font-size:12px;margin-top:8px;">✅ ' + mt5Accounts.length + ' account caricati</p>';
+      
+      if (mt5Accounts.length > 0) {
+        document.getElementById('mt5CurrencySettings').style.display = 'block';
+        consolidateMT5Data();
+        renderMT5Results();
+      }
+    }
+    
+    async function processMT5File(file) {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = e => {
+          try {
+            const wb = XLSX.read(e.target.result, { type: 'array' });
+            const data = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1 });
+            
+            // Estrai info account
+            let accountName = '', accountNumber = '', company = '', currency = 'USD';
+            
+            for (let i = 0; i < 15; i++) {
+              const row = data[i] || [];
+              if (row[0] === 'Name:') accountName = row[3] || '';
+              if (row[0] === 'Account:') {
+                const m = String(row[3] || '').match(/(\d+)/);
+                if (m) accountNumber = m[1];
+              }
+              if (row[0] === 'Company:') company = row[3] || '';
+              if (row[0] === 'Currency:') currency = row[3] || 'USD';
+              // Cerca anche nella colonna B per currency
+              if (String(row[1] || '').toLowerCase().includes('currency')) {
+                currency = String(row[2] || row[3] || 'USD').toUpperCase();
+              }
+            }
+            
+            // Rileva valuta dal contenuto se non trovata
+            if (!currency || currency === 'USD') {
+              const content = JSON.stringify(data).toLowerCase();
+              if (content.includes('eur') && !content.includes('eurusd')) {
+                currency = 'EUR';
+              }
+            }
+            
+            // Trova broker/paese
+            const companyLower = company.toLowerCase();
+            let countryInfo = brokerCountries.default;
+            for (const [broker, info] of Object.entries(brokerCountries)) {
+              if (companyLower.includes(broker)) {
+                countryInfo = info;
+                break;
+              }
+            }
+            
+            // Trova sezione Deals
+            let dealsStart = -1;
+            for (let i = 0; i < data.length; i++) {
+              if (data[i][0] === 'Deals') { dealsStart = i + 2; break; }
+            }
+            
+            if (dealsStart === -1) {
+              reject(new Error('Sezione Deals non trovata'));
+              return;
+            }
+            
+            // Processa deals
+            const trades = [];
+            let grossProfit = 0, grossLoss = 0, wins = 0, losses = 0;
+            let valoreIniziale = 0, valoreFinale = 0;
+            let minDate = null, maxDate = null;
+            let balanceHistory = [];
+            
+            for (let i = dealsStart; i < data.length; i++) {
+              const row = data[i];
+              const dateStr = String(row[0] || '');
+              
+              // Stop se nuova sezione
+              if (!dateStr.match(/^\d{4}\.\d{2}\.\d{2}/) && row[0]) {
+                if (['Orders', 'Positions', 'Working Orders'].includes(row[0])) break;
+              }
+              
+              if (!dateStr.match(/^\d{4}\.\d{2}\.\d{2}/)) continue;
+              
+              try {
+                const profit = parseFloat(row[12]) || 0;
+                const type = String(row[3] || '').toLowerCase();
+                const entry = String(row[6] || '').toLowerCase();
+                const balance = parseFloat(row[13]) || 0;
+                
+                const tradeDate = new Date(dateStr.replace(/\./g, '-'));
+                if (!minDate || tradeDate < minDate) minDate = tradeDate;
+                if (!maxDate || tradeDate > maxDate) maxDate = tradeDate;
+                
+                // Traccia balance
+                if (balance > 0) {
+                  balanceHistory.push({ date: tradeDate, balance, type, entry, profit });
+                }
+                
+                // Solo trade chiusi (non deposit/withdrawal)
+                if ((type === 'buy' || type === 'sell') && (entry === 'out' || entry === 'in/out')) {
+                  trades.push({
+                    date: tradeDate,
+                    profit: profit,
+                    symbol: row[4] || '',
+                    volume: parseFloat(row[5]) || 0
+                  });
+                  
+                  if (profit > 0) {
+                    grossProfit += profit;
+                    wins++;
+                  } else if (profit < 0) {
+                    grossLoss += profit;
+                    losses++;
+                  }
+                }
+              } catch (e) {
+                console.error('Errore riga:', e);
+              }
+            }
+            
+            // Calcola valore iniziale e finale
+            if (balanceHistory.length > 0) {
+              // Ordina per data
+              balanceHistory.sort((a, b) => a.date - b.date);
+              
+              // Trova primo balance dopo depositi iniziali
+              for (let i = 0; i < balanceHistory.length; i++) {
+                const entry = balanceHistory[i];
+                if (entry.type === 'balance' || entry.type === 'deposit' || entry.type === 'credit') {
+                  valoreIniziale = entry.balance;
+                } else {
+                  break;
+                }
+              }
+              
+              // Ultimo balance
+              valoreFinale = balanceHistory[balanceHistory.length - 1].balance;
+            }
+            
+            resolve({
+              accountName,
+              accountNumber,
+              company,
+              currency,
+              countryInfo,
+              trades,
+              grossProfit,
+              grossLoss,
+              netProfit: grossProfit + grossLoss,
+              wins,
+              losses,
+              valoreIniziale,
+              valoreFinale,
+              minDate,
+              maxDate,
+              fileName: file.name
+            });
+            
+          } catch (e) {
+            reject(e);
+          }
+        };
+        reader.onerror = () => reject(new Error('Errore lettura file'));
+        reader.readAsArrayBuffer(file);
+      });
+    }
+    
+    function consolidateMT5Data() {
+      mt5YearlyData = {};
+      const yearsFound = new Set();
+      
+      mt5Accounts.forEach(acc => {
+        acc.trades.forEach(trade => {
+          const year = trade.date.getFullYear();
+          yearsFound.add(year);
+          
+          if (!mt5YearlyData[year]) {
+            mt5YearlyData[year] = {
+              accounts: {},
+              totals: {
+                trades: 0, wins: 0, losses: 0,
+                grossProfit: 0, grossLoss: 0, netProfit: 0,
+                valoreIniziale: 0, valoreFinale: 0, ivafe: 0
+              }
+            };
+          }
+          
+          const accKey = acc.accountNumber;
+          if (!mt5YearlyData[year].accounts[accKey]) {
+            mt5YearlyData[year].accounts[accKey] = {
+              accountName: acc.accountName,
+              accountNumber: acc.accountNumber,
+              company: acc.company,
+              currency: acc.currency,
+              countryInfo: acc.countryInfo,
+              trades: 0, wins: 0, losses: 0,
+              grossProfit: 0, grossLoss: 0, netProfit: 0,
+              valoreIniziale: acc.valoreIniziale,
+              valoreFinale: 0,
+              giorni: 0,
+              ivafe: 0
+            };
+          }
+          
+          const yearAcc = mt5YearlyData[year].accounts[accKey];
+          yearAcc.trades++;
+          if (trade.profit > 0) {
+            yearAcc.grossProfit += trade.profit;
+            yearAcc.wins++;
+          } else {
+            yearAcc.grossLoss += trade.profit;
+            yearAcc.losses++;
+          }
+          yearAcc.netProfit = yearAcc.grossProfit + yearAcc.grossLoss;
+          yearAcc.valoreFinale = acc.valoreFinale;
+        });
+      });
+      
+      // Calcola totali e IVAFE per ogni anno
+      Object.keys(mt5YearlyData).forEach(year => {
+        const data = mt5YearlyData[year];
+        
+        Object.values(data.accounts).forEach(acc => {
+          // Converti in EUR se necessario
+          const rate = acc.currency === 'USD' ? mt5ExchangeRates[year] || 1.08 : 1;
+          acc.grossProfitEUR = acc.grossProfit / rate;
+          acc.grossLossEUR = acc.grossLoss / rate;
+          acc.netProfitEUR = acc.netProfit / rate;
+          acc.valoreInizialeEUR = acc.valoreIniziale / rate;
+          acc.valoreFinaleEUR = acc.valoreFinale / rate;
+          
+          // Giorni detenzione (approssimato a 365 se annuale)
+          acc.giorni = 365;
+          
+          // IVAFE: 0.2% sul valore medio
+          const valoreMedio = (acc.valoreInizialeEUR + acc.valoreFinaleEUR) / 2;
+          acc.ivafe = valoreMedio * 0.002 * (acc.giorni / 365);
+          
+          // Aggiorna totali
+          data.totals.trades += acc.trades;
+          data.totals.wins += acc.wins;
+          data.totals.losses += acc.losses;
+          data.totals.grossProfit += acc.grossProfitEUR;
+          data.totals.grossLoss += acc.grossLossEUR;
+          data.totals.netProfit += acc.netProfitEUR;
+          data.totals.valoreIniziale += acc.valoreInizialeEUR;
+          data.totals.valoreFinale += acc.valoreFinaleEUR;
+          data.totals.ivafe += acc.ivafe;
+        });
+      });
+      
+      // Aggiorna UI cambi
+      renderMT5ExchangeRates(yearsFound);
+    }
+    
+    function renderMT5ExchangeRates(years) {
+      const container = document.getElementById('mt5ExchangeRates');
+      container.innerHTML = '';
+      
+      const sortedYears = Array.from(years).sort();
+      sortedYears.forEach(year => {
+        const div = document.createElement('div');
+        div.className = 'form-group';
+        div.style.minWidth = '120px';
+        div.innerHTML = `
+          <label>${year}</label>
+          <input type="number" step="0.0001" value="${mt5ExchangeRates[year] || 1.08}" 
+                 onchange="updateMT5ExchangeRate(${year}, this.value)" 
+                 style="width:100%;">
+        `;
+        container.appendChild(div);
+      });
+    }
+    
+    function updateMT5ExchangeRate(year, value) {
+      mt5ExchangeRates[year] = parseFloat(value) || 1.08;
+      consolidateMT5Data();
+      renderMT5Results();
+    }
+    
+    function resetMT5ExchangeRates() {
+      mt5ExchangeRates = { ...defaultExchangeRates };
+      consolidateMT5Data();
+      renderMT5Results();
+    }
+    
+    function renderMT5Results() {
+      document.getElementById('mt5Results').style.display = 'block';
+      
+      // Totali globali
+      let totalTrades = 0, totalProfit = 0, totalIVAFE = 0, totalRT = 0;
+      Object.values(mt5YearlyData).forEach(data => {
+        totalTrades += data.totals.trades;
+        totalProfit += data.totals.netProfit;
+        totalIVAFE += data.totals.ivafe;
+        if (data.totals.netProfit > 0) {
+          totalRT += data.totals.netProfit * 0.26;
+        }
+      });
+      
+      document.getElementById('mt5TotalStats').innerHTML = `
+        <div class="stat-card">
+          <div class="stat-number orange">${mt5Accounts.length}</div>
+          <div class="stat-label">Account</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-number blue">${totalTrades}</div>
+          <div class="stat-label">Trade Totali</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-number ${totalProfit >= 0 ? 'green' : 'red'}">€${totalProfit.toFixed(0)}</div>
+          <div class="stat-label">Profitto Netto</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-number" style="color:#ef4444;">€${totalRT.toFixed(0)}</div>
+          <div class="stat-label">Imposta RT (26%)</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-number" style="color:#fbbf24;">€${totalIVAFE.toFixed(0)}</div>
+          <div class="stat-label">IVAFE (0.2%)</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-number" style="color:#a855f7;">€${(totalRT + totalIVAFE).toFixed(0)}</div>
+          <div class="stat-label">Totale Imposte</div>
+        </div>
+      `;
+      
+      // Dettaglio per anno
+      const yearlyContainer = document.getElementById('mt5YearlyResults');
+      yearlyContainer.innerHTML = '';
+      
+      Object.keys(mt5YearlyData).sort().forEach(year => {
+        const data = mt5YearlyData[year];
+        const t = data.totals;
+        const impostaRT = t.netProfit > 0 ? t.netProfit * 0.26 : 0;
+        
+        let accountsHTML = '';
+        Object.values(data.accounts).forEach(acc => {
+          const impAcc = acc.netProfitEUR > 0 ? acc.netProfitEUR * 0.26 : 0;
+          accountsHTML += `
+            <div class="mt5-account-row">
+              <div class="mt5-stat">
+                <div class="label">Account</div>
+                <div class="value">${acc.accountNumber}</div>
+              </div>
+              <div class="mt5-stat">
+                <div class="label">Broker</div>
+                <div class="value">${acc.company.substring(0, 15)}</div>
+              </div>
+              <div class="mt5-stat">
+                <div class="label">Valuta</div>
+                <div class="value">${acc.currency}</div>
+              </div>
+              <div class="mt5-stat">
+                <div class="label">Trade</div>
+                <div class="value">${acc.trades}</div>
+              </div>
+              <div class="mt5-stat">
+                <div class="label">Profitto</div>
+                <div class="value ${acc.netProfitEUR >= 0 ? 'mt5-profit' : 'mt5-loss'}">€${acc.netProfitEUR.toFixed(2)}</div>
+              </div>
+              <div class="mt5-stat">
+                <div class="label">RT 26%</div>
+                <div class="value mt5-loss">€${impAcc.toFixed(2)}</div>
+              </div>
+              <div class="mt5-stat">
+                <div class="label">IVAFE</div>
+                <div class="value" style="color:#fbbf24;">€${acc.ivafe.toFixed(2)}</div>
+              </div>
+            </div>
+          `;
+        });
+        
+        yearlyContainer.innerHTML += `
+          <div class="mt5-year-card">
+            <div class="mt5-year-header">
+              <div class="mt5-year-badge">${year}</div>
+              <div>
+                <button class="btn btn-secondary btn-small" onclick="genMT5RT(${year})">📄 Quadro RT</button>
+                <button class="btn btn-secondary btn-small" onclick="genMT5RW(${year})">📄 Quadro RW</button>
+              </div>
+            </div>
+            ${accountsHTML}
+            <div class="mt5-info-box">
+              <strong>Riepilogo ${year}:</strong> 
+              ${t.trades} trade | 
+              Profitto: €${t.netProfit.toFixed(2)} | 
+              Imposta RT: €${impostaRT.toFixed(2)} | 
+              IVAFE: €${t.ivafe.toFixed(2)} |
+              <strong>Totale: €${(impostaRT + t.ivafe).toFixed(2)}</strong>
+            </div>
+          </div>
+        `;
+      });
+    }
+    
+    function genMT5RT(year) {
+      const { jsPDF } = window.jspdf;
+      const doc = new jsPDF();
+      const data = mt5YearlyData[year];
+      if (!data) return;
+      
+      const t = data.totals;
+      const imposta = t.netProfit > 0 ? t.netProfit * 0.26 : 0;
+      
+      // Header
+      doc.setFontSize(18);
+      doc.setTextColor(0, 100, 200);
+      doc.text('QUADRO RT - PLUSVALENZE FINANZIARIE', 105, 20, { align: 'center' });
+      
+      doc.setFontSize(12);
+      doc.setTextColor(100, 100, 100);
+      doc.text(`Anno d'imposta: ${year}`, 105, 30, { align: 'center' });
+      
+      // Box riepilogo
+      doc.setFillColor(240, 248, 255);
+      doc.rect(15, 40, 180, 60, 'F');
+      doc.setDrawColor(0, 100, 200);
+      doc.rect(15, 40, 180, 60, 'S');
+      
+      doc.setFontSize(11);
+      doc.setTextColor(0, 0, 0);
+      let y = 52;
+      doc.text(`Totale Corrispettivi (RT21): €${(t.grossProfit + Math.abs(t.grossLoss)).toFixed(2)}`, 25, y);
+      y += 10;
+      doc.text(`Totale Costi (RT22): €${Math.abs(t.grossLoss).toFixed(2)}`, 25, y);
+      y += 10;
+      doc.text(`Plusvalenza Netta (RT23): €${t.netProfit.toFixed(2)}`, 25, y);
+      y += 10;
+      
+      doc.setFontSize(14);
+      doc.setTextColor(200, 0, 0);
+      doc.text(`IMPOSTA SOSTITUTIVA 26% (RT26): €${imposta.toFixed(2)}`, 25, y + 5);
+      
+      // Dettaglio account
+      y = 115;
+      doc.setFontSize(12);
+      doc.setTextColor(0, 0, 0);
+      doc.text('DETTAGLIO PER ACCOUNT:', 15, y);
+      y += 10;
+      
+      doc.setFontSize(9);
+      Object.values(data.accounts).forEach(acc => {
+        const impAcc = acc.netProfitEUR > 0 ? acc.netProfitEUR * 0.26 : 0;
+        doc.text(`• ${acc.accountNumber} (${acc.company}) - ${acc.currency}`, 20, y);
+        y += 6;
+        doc.text(`  Profitto: €${acc.netProfitEUR.toFixed(2)} | Imposta: €${impAcc.toFixed(2)}`, 20, y);
+        y += 8;
+      });
+      
+      // Note
+      y += 10;
+      doc.setFontSize(10);
+      doc.setTextColor(100, 100, 100);
+      doc.text('Note:', 15, y);
+      y += 6;
+      doc.setFontSize(8);
+      doc.text('• Le plusvalenze da trading con broker esteri sono soggette a imposta sostitutiva del 26%', 15, y);
+      y += 5;
+      doc.text('• Compilare il Quadro RT del Modello Redditi PF', 15, y);
+      y += 5;
+      doc.text('• Le minusvalenze possono essere compensate nei 4 anni successivi', 15, y);
+      
+      // Footer
+      doc.setFontSize(8);
+      doc.setTextColor(150, 150, 150);
+      doc.text(`Generato il ${new Date().toLocaleDateString('it-IT')} - EA Business Dashboard`, 105, 287, { align: 'center' });
+      
+      doc.save(`Quadro_RT_${year}.pdf`);
+    }
+    
+    function genMT5RW(year) {
+      const { jsPDF } = window.jspdf;
+      const doc = new jsPDF();
+      const data = mt5YearlyData[year];
+      if (!data) return;
+      
+      // Header
+      doc.setFontSize(18);
+      doc.setTextColor(0, 150, 100);
+      doc.text('QUADRO RW - MONITORAGGIO FISCALE', 105, 20, { align: 'center' });
+      
+      doc.setFontSize(12);
+      doc.setTextColor(100, 100, 100);
+      doc.text(`Anno d'imposta: ${year}`, 105, 30, { align: 'center' });
+      
+      let y = 45;
+      
+      Object.values(data.accounts).forEach((acc, idx) => {
+        // Box account
+        doc.setFillColor(240, 255, 245);
+        doc.rect(15, y, 180, 50, 'F');
+        doc.setDrawColor(0, 150, 100);
+        doc.rect(15, y, 180, 50, 'S');
+        
+        doc.setFontSize(11);
+        doc.setTextColor(0, 0, 0);
+        
+        const innerY = y + 10;
+        doc.text(`Account #${idx + 1}: ${acc.accountNumber}`, 20, innerY);
+        doc.setFontSize(9);
+        doc.text(`Broker: ${acc.company}`, 20, innerY + 8);
+        doc.text(`Paese: ${acc.countryInfo.name} (Codice: ${acc.countryInfo.code})`, 20, innerY + 14);
+        doc.text(`Valuta conto: ${acc.currency}`, 20, innerY + 20);
+        
+        doc.text(`Valore Iniziale: €${acc.valoreInizialeEUR.toFixed(2)}`, 110, innerY + 8);
+        doc.text(`Valore Finale: €${acc.valoreFinaleEUR.toFixed(2)}`, 110, innerY + 14);
+        doc.text(`Giorni: ${acc.giorni}`, 110, innerY + 20);
+        
+        doc.setFontSize(10);
+        doc.setTextColor(200, 150, 0);
+        doc.text(`IVAFE: €${acc.ivafe.toFixed(2)}`, 110, innerY + 32);
+        
+        y += 58;
+      });
+      
+      // Totale IVAFE
+      doc.setFillColor(255, 250, 230);
+      doc.rect(15, y, 180, 20, 'F');
+      doc.setDrawColor(200, 150, 0);
+      doc.rect(15, y, 180, 20, 'S');
+      
+      doc.setFontSize(12);
+      doc.setTextColor(200, 100, 0);
+      doc.text(`TOTALE IVAFE ${year}: €${data.totals.ivafe.toFixed(2)}`, 105, y + 13, { align: 'center' });
+      
+      // Note
+      y += 35;
+      doc.setFontSize(10);
+      doc.setTextColor(100, 100, 100);
+      doc.text('Istruzioni Quadro RW:', 15, y);
+      y += 6;
+      doc.setFontSize(8);
+      doc.text('• Codice investimento: 14 (Altri strumenti finanziari)', 15, y);
+      y += 5;
+      doc.text('• IVAFE: 0.2% sul valore medio annuo (proporzionato ai giorni di detenzione)', 15, y);
+      y += 5;
+      doc.text('• Obbligo monitoraggio per attività finanziarie estere > €15.000 valore massimo', 15, y);
+      
+      // Footer
+      doc.setFontSize(8);
+      doc.setTextColor(150, 150, 150);
+      doc.text(`Generato il ${new Date().toLocaleDateString('it-IT')} - EA Business Dashboard`, 105, 287, { align: 'center' });
+      
+      doc.save(`Quadro_RW_${year}.pdf`);
+    }
+    
+    function exportAllMT5PDF() {
+      const years = Object.keys(mt5YearlyData).sort();
+      let delay = 0;
+      
+      years.forEach(year => {
+        setTimeout(() => genMT5RT(parseInt(year)), delay);
+        delay += 800;
+        setTimeout(() => genMT5RW(parseInt(year)), delay);
+        delay += 800;
+      });
+      
+      setTimeout(() => {
+        showStatus(`✅ Generati ${years.length * 2} PDF (RT + RW) per: ${years.join(', ')}`);
+      }, delay);
+    }
+    
+    function exportMT5CSV() {
+      let csv = 'Anno,Account,Broker,Valuta,Trade,Profitto Lordo,Perdita,Profitto Netto EUR,Imposta RT,Val.Iniziale,Val.Finale,IVAFE\n';
+      
+      Object.entries(mt5YearlyData).sort().forEach(([year, data]) => {
+        Object.values(data.accounts).forEach(acc => {
+          const imposta = acc.netProfitEUR > 0 ? (acc.netProfitEUR * 0.26).toFixed(2) : '0.00';
+          csv += `${year},${acc.accountNumber},"${acc.company}",${acc.currency},`;
+          csv += `${acc.trades},${acc.grossProfitEUR.toFixed(2)},${Math.abs(acc.grossLossEUR).toFixed(2)},${acc.netProfitEUR.toFixed(2)},${imposta},`;
+          csv += `${acc.valoreInizialeEUR.toFixed(2)},${acc.valoreFinaleEUR.toFixed(2)},${acc.ivafe.toFixed(2)}\n`;
+        });
+      });
+      
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+      link.download = `MT5_Fiscal_Report_${new Date().toISOString().split('T')[0]}.csv`;
+      link.click();
+      
+      showStatus('✅ CSV esportato!');
+    }
+    
+    function clearMT5Data() {
+      if (!confirm('Cancellare tutti i dati MT5 caricati?')) return;
+      mt5Accounts = [];
+      mt5YearlyData = {};
+      document.getElementById('mt5Results').style.display = 'none';
+      document.getElementById('mt5CurrencySettings').style.display = 'none';
+      document.getElementById('mt5DropZone').innerHTML = '<div style="font-size:48px;">📊</div><p>Trascina qui i report MT5 (.xlsx)</p><p style="color:rgba(255,255,255,0.4);font-size:12px;margin-top:8px;">💡 Genera il report da MT5: Toolbox → Cronologia → Tasto destro → Report → Excel</p>';
+      showStatus('🗑️ Dati MT5 cancellati');
+    }
   </script>
 </body>
 </html>
