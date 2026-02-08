@@ -4,12 +4,3 @@
     { "source": "/api/(.*)", "destination": "/api/$1" }
   ]
 }
-```
-
-5. Clicca **"Commit changes"**
-
----
-
-Aspetta 1 minuto e riprova:
-```
-https://ea-license-system.vercel.app/admin.html
