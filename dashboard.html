@@ -392,6 +392,7 @@
         <div class="tab" data-tab="licenze">🔑 Licenze</div>
         <div class="tab" data-tab="tasse">💰 Tasse</div>
         <div class="tab" data-tab="export">📥 Export</div>
+        <div class="tab" data-tab="settings">⚙️ Impostazioni</div>
         <button class="btn btn-secondary" style="margin-left:auto;" onclick="logout()">Logout</button>
       </div>
       
@@ -725,6 +726,53 @@
           <button class="btn btn-danger" onclick="clearAllData()">🗑️ Cancella tutti i dati</button>
         </div>
       </div>
+
+      <!-- ==================== SETTINGS TAB ==================== -->
+      <div id="tab-settings" class="panel">
+        
+        <div class="card">
+          <div class="card-title">💰 Prezzi Vendita Privata</div>
+          <p style="color:rgba(255,255,255,0.6);margin-bottom:20px;">
+            Imposta i prezzi per la pagina di acquisto privata. I clienti vedranno questi prezzi.
+          </p>
+          <div class="form-row">
+            <div class="form-group">
+              <label>XAU AutoTrader (EUR)</label>
+              <input type="number" id="priceXAU" value="499" step="1">
+            </div>
+            <div class="form-group">
+              <label>BTC AutoTrader (EUR)</label>
+              <input type="number" id="priceBTC" value="499" step="1">
+            </div>
+          </div>
+          <button class="btn btn-primary" onclick="saveSettings()">💾 Salva Prezzi</button>
+        </div>
+        
+        <div class="card">
+          <div class="card-title">🔗 Link Pagina Acquisto</div>
+          <p style="color:rgba(255,255,255,0.6);margin-bottom:16px;">
+            Condividi questo link con i clienti per acquisti privati:
+          </p>
+          <div style="display:flex;gap:12px;align-items:center;">
+            <input type="text" id="buyLink" readonly value="" style="flex:1;background:#0a0a0f;">
+            <button class="btn btn-secondary" onclick="copyBuyLink()">📋 Copia</button>
+          </div>
+        </div>
+        
+        <div class="card">
+          <div class="card-title">🔑 Stripe API Keys</div>
+          <p style="color:rgba(255,255,255,0.6);margin-bottom:16px;">
+            Le chiavi Stripe sono configurate nelle Environment Variables di Vercel.<br>
+            <a href="https://vercel.com" target="_blank" style="color:#00FF41;">Vai su Vercel</a> → Settings → Environment Variables
+          </p>
+          <ul style="color:rgba(255,255,255,0.5);font-size:13px;margin-left:20px;">
+            <li><code>STRIPE_SECRET_KEY</code> - sk_live_...</li>
+            <li><code>STRIPE_PUBLISHABLE_KEY</code> - pk_live_...</li>
+            <li><code>STRIPE_WEBHOOK_SECRET</code> - whsec_...</li>
+          </ul>
+        </div>
+        
+      </div>
       
     </div>
   </div>
@@ -789,6 +837,7 @@
         $(tabId).classList.add('active');
         
         if (tab.dataset.tab === 'tasse') loadTaxData();
+        if (tab.dataset.tab === 'settings') loadSettings();
       });
     });
     
@@ -1355,6 +1404,60 @@
       if (!confirm('🚨 ULTIMA CONFERMA: Hai esportato un backup? Questa azione è IRREVERSIBILE.')) return;
       
       showStatus('⚠️ Cancellazione massiva non implementata per sicurezza. Elimina i record singolarmente.', true);
+    }
+    
+    // ==================== SETTINGS ====================
+    async function loadSettings() {
+      try {
+        const res = await fetch('/api/admin?type=settings', {
+          headers: { 'Authorization': `Bearer ${adminPassword}` }
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (data.settings) {
+            $('priceXAU').value = data.settings.price_xau || 499;
+            $('priceBTC').value = data.settings.price_btc || 499;
+          }
+        }
+      } catch (err) {
+        console.log('Settings not found, using defaults');
+      }
+      
+      // Set buy link
+      const baseUrl = window.location.origin;
+      $('buyLink').value = `${baseUrl}/buy.html`;
+    }
+    
+    async function saveSettings() {
+      const settings = {
+        price_xau: parseInt($('priceXAU').value) || 499,
+        price_btc: parseInt($('priceBTC').value) || 499
+      };
+      
+      try {
+        const res = await fetch('/api/admin?type=settings', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${adminPassword}`
+          },
+          body: JSON.stringify(settings)
+        });
+        
+        if (res.ok) {
+          showStatus('✅ Prezzi salvati!');
+        } else {
+          showStatus('Errore salvataggio', true);
+        }
+      } catch (err) {
+        showStatus('Errore di rete', true);
+      }
+    }
+    
+    function copyBuyLink() {
+      const link = $('buyLink').value;
+      navigator.clipboard.writeText(link);
+      showStatus('✅ Link copiato!');
     }
     
     // ==================== IMPORT MQL5 JSON ====================

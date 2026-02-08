@@ -249,6 +249,42 @@ export default async function handler(req, res) {
       }
     }
 
+    // ==================== SETTINGS ====================
+    if (type === 'settings') {
+      // GET - Load settings
+      if (req.method === 'GET') {
+        const { data, error } = await supabase
+          .from('settings')
+          .select('*')
+          .eq('key', 'prices')
+          .single();
+
+        if (error || !data) {
+          return res.status(200).json({ settings: { price_xau: 499, price_btc: 499 } });
+        }
+
+        return res.status(200).json({ settings: JSON.parse(data.value) });
+      }
+
+      // POST - Save settings
+      if (req.method === 'POST') {
+        const { price_xau, price_btc } = req.body;
+
+        const value = JSON.stringify({
+          price_xau: price_xau || 499,
+          price_btc: price_btc || 499
+        });
+
+        // Upsert settings
+        const { error } = await supabase
+          .from('settings')
+          .upsert({ key: 'prices', value: value }, { onConflict: 'key' });
+
+        if (error) throw error;
+        return res.status(200).json({ success: true });
+      }
+    }
+
     return res.status(405).json({ error: 'Method not allowed' });
 
   } catch (err) {

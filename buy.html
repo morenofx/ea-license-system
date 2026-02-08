@@ -1,0 +1,453 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Buy EA License - Smart Trading Bots</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🤖</text></svg>">
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <script src="https://js.stripe.com/v3/"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    
+    body {
+      min-height: 100vh;
+      background: #0a0a0f;
+      font-family: 'IBM Plex Sans', -apple-system, sans-serif;
+      color: #e6edf3;
+      padding: 24px 16px;
+    }
+    
+    .container { max-width: 600px; margin: 0 auto; }
+    
+    .header { text-align: center; margin-bottom: 32px; }
+    
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: rgba(0, 255, 65, 0.1);
+      border: 1px solid rgba(0, 255, 65, 0.2);
+      border-radius: 100px;
+      padding: 8px 20px;
+      margin-bottom: 16px;
+      font-size: 13px;
+      font-weight: 500;
+      color: #00FF41;
+    }
+    
+    h1 {
+      font-size: 28px;
+      font-weight: 700;
+      color: #fff;
+      margin-bottom: 8px;
+    }
+    
+    .subtitle { font-size: 14px; color: rgba(255,255,255,0.5); }
+    
+    .card {
+      background: #12121a;
+      border: 1px solid #333;
+      border-radius: 16px;
+      padding: 24px;
+      margin-bottom: 20px;
+    }
+    
+    .card-title {
+      font-size: 16px;
+      font-weight: 600;
+      color: #00FF41;
+      margin-bottom: 16px;
+    }
+    
+    /* Product Selection */
+    .products {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin-bottom: 24px;
+    }
+    
+    .product {
+      background: #0a0a0f;
+      border: 2px solid #333;
+      border-radius: 12px;
+      padding: 20px;
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    
+    .product:hover { border-color: #555; }
+    .product.selected { border-color: #00FF41; background: rgba(0, 255, 65, 0.05); }
+    
+    .product-icon { font-size: 32px; margin-bottom: 8px; }
+    .product-name { font-weight: 600; margin-bottom: 4px; }
+    .product-price { font-size: 24px; font-weight: 700; color: #00FF41; }
+    .product-price span { font-size: 14px; color: rgba(255,255,255,0.5); }
+    
+    /* Form */
+    .form-group { margin-bottom: 16px; }
+    
+    label {
+      display: block;
+      font-size: 13px;
+      color: rgba(255,255,255,0.6);
+      margin-bottom: 6px;
+      font-weight: 500;
+    }
+    
+    input {
+      width: 100%;
+      background: #0a0a0f;
+      border: 1px solid #333;
+      border-radius: 8px;
+      padding: 14px 16px;
+      color: #fff;
+      font-size: 15px;
+      font-family: 'IBM Plex Sans', sans-serif;
+      transition: all 0.2s;
+    }
+    
+    input:focus {
+      outline: none;
+      border-color: #00FF41;
+      box-shadow: 0 0 0 3px rgba(0, 255, 65, 0.15);
+    }
+    
+    input::placeholder { color: rgba(255,255,255,0.3); }
+    
+    .help-text {
+      font-size: 12px;
+      color: rgba(255,255,255,0.4);
+      margin-top: 6px;
+    }
+    
+    /* Button */
+    .btn {
+      width: 100%;
+      padding: 16px 24px;
+      border-radius: 8px;
+      font-weight: 600;
+      font-size: 16px;
+      cursor: pointer;
+      transition: all 0.2s;
+      border: none;
+      font-family: 'IBM Plex Sans', sans-serif;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+    
+    .btn-primary {
+      background: #00FF41;
+      color: #0a0a0f;
+    }
+    
+    .btn-primary:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 0 20px rgba(0, 255, 65, 0.4);
+    }
+    
+    .btn-primary:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+      transform: none;
+      box-shadow: none;
+    }
+    
+    /* Status */
+    .status {
+      padding: 12px 16px;
+      border-radius: 8px;
+      margin-bottom: 16px;
+      font-size: 14px;
+      display: none;
+    }
+    
+    .status.error {
+      display: block;
+      background: rgba(239, 68, 68, 0.1);
+      border: 1px solid rgba(239, 68, 68, 0.3);
+      color: #ef4444;
+    }
+    
+    .status.success {
+      display: block;
+      background: rgba(34, 197, 94, 0.1);
+      border: 1px solid rgba(34, 197, 94, 0.3);
+      color: #22c55e;
+    }
+    
+    /* Features */
+    .features {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      margin-top: 20px;
+      padding-top: 20px;
+      border-top: 1px solid #333;
+    }
+    
+    .feature {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 14px;
+      color: rgba(255,255,255,0.7);
+    }
+    
+    .feature-icon { color: #00FF41; }
+    
+    /* Secure badge */
+    .secure-badge {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      margin-top: 16px;
+      font-size: 13px;
+      color: rgba(255,255,255,0.4);
+    }
+    
+    /* Loading spinner */
+    .spinner {
+      width: 20px;
+      height: 20px;
+      border: 2px solid transparent;
+      border-top-color: #0a0a0f;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+    
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+    
+    /* Success page */
+    .success-box {
+      text-align: center;
+      padding: 40px 20px;
+    }
+    
+    .success-icon {
+      font-size: 64px;
+      margin-bottom: 20px;
+    }
+    
+    .success-box h2 {
+      color: #00FF41;
+      margin-bottom: 16px;
+    }
+    
+    .success-box p {
+      color: rgba(255,255,255,0.7);
+      margin-bottom: 8px;
+    }
+    
+    @media (max-width: 500px) {
+      .products { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    
+    <!-- Header -->
+    <div class="header">
+      <div class="badge">🤖 SMART TRADING BOTS</div>
+      <h1>Purchase License</h1>
+      <p class="subtitle">Lifetime license • Instant activation</p>
+    </div>
+    
+    <!-- Main Form -->
+    <div id="purchaseForm">
+      <div id="statusMsg" class="status"></div>
+      
+      <!-- Product Selection -->
+      <div class="card">
+        <div class="card-title">1. Select Product</div>
+        <div class="products">
+          <div class="product selected" data-product="XAU_AutoTrader" onclick="selectProduct(this)">
+            <div class="product-icon">🥇</div>
+            <div class="product-name">XAU AutoTrader</div>
+            <div class="product-price" id="priceXAU">€499</div>
+          </div>
+          <div class="product" data-product="BTC_AutoTrader" onclick="selectProduct(this)">
+            <div class="product-icon">₿</div>
+            <div class="product-name">BTC AutoTrader</div>
+            <div class="product-price" id="priceBTC">€499</div>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Customer Info -->
+      <div class="card">
+        <div class="card-title">2. Your Information</div>
+        <div class="form-group">
+          <label>Full Name *</label>
+          <input type="text" id="customerName" placeholder="John Doe" required>
+        </div>
+        <div class="form-group">
+          <label>Email *</label>
+          <input type="email" id="customerEmail" placeholder="john@example.com" required>
+        </div>
+        <div class="form-group">
+          <label>MT4/MT5 Account Number *</label>
+          <input type="text" id="accountNumber" placeholder="12345678" required>
+          <div class="help-text">Find this in your MetaTrader terminal: Help → About</div>
+        </div>
+      </div>
+      
+      <!-- Checkout -->
+      <div class="card">
+        <div class="card-title">3. Complete Purchase</div>
+        <button class="btn btn-primary" id="checkoutBtn" onclick="checkout()">
+          <span id="btnText">💳 Pay Now</span>
+          <div class="spinner" id="btnSpinner" style="display:none;"></div>
+        </button>
+        
+        <div class="secure-badge">
+          🔒 Secure payment powered by Stripe
+        </div>
+        
+        <div class="features">
+          <div class="feature"><span class="feature-icon">✓</span> Lifetime license - no monthly fees</div>
+          <div class="feature"><span class="feature-icon">✓</span> Instant activation after payment</div>
+          <div class="feature"><span class="feature-icon">✓</span> Free updates included</div>
+          <div class="feature"><span class="feature-icon">✓</span> Email support</div>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Success Message (hidden by default) -->
+    <div id="successBox" class="card success-box" style="display:none;">
+      <div class="success-icon">✅</div>
+      <h2>Payment Successful!</h2>
+      <p>Your license has been activated.</p>
+      <p style="margin-top:16px;">
+        <strong>Product:</strong> <span id="successProduct"></span><br>
+        <strong>Account:</strong> <span id="successAccount"></span>
+      </p>
+      <p style="margin-top:20px;font-size:13px;color:rgba(255,255,255,0.5);">
+        A confirmation email has been sent to your address.<br>
+        You can now use the EA on your MetaTrader account.
+      </p>
+    </div>
+    
+  </div>
+
+  <script>
+    let selectedProduct = 'XAU_AutoTrader';
+    let prices = { XAU_AutoTrader: 499, BTC_AutoTrader: 499 };
+    
+    // Load prices from server
+    async function loadPrices() {
+      try {
+        const res = await fetch('/api/prices');
+        if (res.ok) {
+          const data = await res.json();
+          prices.XAU_AutoTrader = data.price_xau || 499;
+          prices.BTC_AutoTrader = data.price_btc || 499;
+          document.getElementById('priceXAU').textContent = '€' + prices.XAU_AutoTrader;
+          document.getElementById('priceBTC').textContent = '€' + prices.BTC_AutoTrader;
+        }
+      } catch (err) {
+        console.log('Using default prices');
+      }
+    }
+    
+    function selectProduct(el) {
+      document.querySelectorAll('.product').forEach(p => p.classList.remove('selected'));
+      el.classList.add('selected');
+      selectedProduct = el.dataset.product;
+    }
+    
+    function showStatus(msg, isError = false) {
+      const el = document.getElementById('statusMsg');
+      el.textContent = msg;
+      el.className = 'status ' + (isError ? 'error' : 'success');
+    }
+    
+    function setLoading(loading) {
+      const btn = document.getElementById('checkoutBtn');
+      const text = document.getElementById('btnText');
+      const spinner = document.getElementById('btnSpinner');
+      
+      btn.disabled = loading;
+      text.style.display = loading ? 'none' : 'inline';
+      spinner.style.display = loading ? 'block' : 'none';
+    }
+    
+    async function checkout() {
+      const name = document.getElementById('customerName').value.trim();
+      const email = document.getElementById('customerEmail').value.trim();
+      const account = document.getElementById('accountNumber').value.trim();
+      
+      // Validate
+      if (!name || !email || !account) {
+        showStatus('Please fill in all fields', true);
+        return;
+      }
+      
+      if (!email.includes('@')) {
+        showStatus('Please enter a valid email', true);
+        return;
+      }
+      
+      if (account.length < 5) {
+        showStatus('Please enter a valid MT4/MT5 account number', true);
+        return;
+      }
+      
+      setLoading(true);
+      
+      try {
+        const res = await fetch('/api/checkout', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            product: selectedProduct,
+            customer_name: name,
+            customer_email: email,
+            account_number: account
+          })
+        });
+        
+        const data = await res.json();
+        
+        if (!res.ok) {
+          throw new Error(data.error || 'Checkout failed');
+        }
+        
+        // Redirect to Stripe Checkout
+        if (data.url) {
+          window.location.href = data.url;
+        } else {
+          throw new Error('No checkout URL received');
+        }
+        
+      } catch (err) {
+        showStatus(err.message, true);
+        setLoading(false);
+      }
+    }
+    
+    // Check for success return
+    function checkSuccess() {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get('success') === 'true') {
+        document.getElementById('purchaseForm').style.display = 'none';
+        document.getElementById('successBox').style.display = 'block';
+        document.getElementById('successProduct').textContent = params.get('product') || 'EA License';
+        document.getElementById('successAccount').textContent = params.get('account') || '';
+      }
+    }
+    
+    // Init
+    loadPrices();
+    checkSuccess();
+  </script>
+</body>
+</html>
