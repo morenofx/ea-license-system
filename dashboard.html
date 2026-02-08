@@ -754,12 +754,12 @@
               <input type="number" id="altriRedditi" placeholder="0" step="100" oninput="calculateTaxes()">
             </div>
             <div class="form-group">
-              <label>Commissioni prelievo MQL5 (1.5% + 1€)</label>
-              <input type="number" id="commissioniPrelievo" placeholder="0" step="0.01" oninput="calculateTaxes()">
+              <label>Numero prelievi effettuati</label>
+              <input type="number" id="numeroPrelievi" placeholder="0" step="1" min="0" oninput="calculateTaxes()">
             </div>
           </div>
           <p style="font-size:12px;color:rgba(255,255,255,0.5);margin-top:8px;">
-            💡 Le commissioni di prelievo le trovi nello storico prelievi MQL5
+            💡 Commissione MQL5: <strong>1.5%</strong> sul netto + <strong>1€</strong> per ogni prelievo
           </p>
         </div>
         
@@ -1348,7 +1348,10 @@
       const commissioneMQL5 = totLordoEUR - totNettoEUR;
       
       altriRedditiValue = parseFloat($('altriRedditi').value) || 0;
-      const commissioniPrelievo = parseFloat($('commissioniPrelievo').value) || 0;
+      const numeroPrelievi = parseInt($('numeroPrelievi').value) || 0;
+      
+      // Commissioni prelievo: 1.5% sul netto + 1€ per ogni prelievo
+      const commissioniPrelievo = (totNettoEUR * 0.015) + (numeroPrelievi * 1);
       
       // Reddito imponibile = Netto - commissioni prelievo
       const redditoImponibileMQL5 = totNettoEUR - commissioniPrelievo;
@@ -1408,7 +1411,7 @@
           <span class="tax-value green">- €${commissioneMQL5.toFixed(2)}</span>
         </div>
         <div class="tax-row">
-          <span class="tax-label">Commissioni prelievo deducibili</span>
+          <span class="tax-label">Commissioni prelievo (1.5% + ${numeroPrelievi}×1€)</span>
           <span class="tax-value green">- €${commissioniPrelievo.toFixed(2)}</span>
         </div>
         <div class="tax-row">
@@ -1450,7 +1453,10 @@
       const totNettoEUR = sales.reduce((sum, s) => sum + s.amount_eur_net, 0);
       const commissioneMQL5 = totLordoEUR - totNettoEUR;
       const altriRedditiVal = parseFloat($('altriRedditi').value) || 0;
-      const commissioniPrelievoVal = parseFloat($('commissioniPrelievo').value) || 0;
+      const numeroPrelievi = parseInt($('numeroPrelievi').value) || 0;
+      
+      // Commissioni prelievo: 1.5% sul netto + 1€ per ogni prelievo
+      const commissioniPrelievoVal = (totNettoEUR * 0.015) + (numeroPrelievi * 1);
       
       const redditoImponibileMQL5 = totNettoEUR - commissioniPrelievoVal;
       const redditoTotale = redditoImponibileMQL5 + altriRedditiVal;
@@ -1538,7 +1544,7 @@
             <div class="row"><span class="label">Numero vendite</span><span class="value">${sales.length}</span></div>
             <div class="row"><span class="label">Totale lordo EUR</span><span class="value">€${totLordoEUR.toFixed(2)}</span></div>
             <div class="row"><span class="label">Commissione piattaforma (20%)</span><span class="value">- €${commissioneMQL5.toFixed(2)}</span></div>
-            <div class="row"><span class="label">Commissioni prelievo (1.5% + 1€)</span><span class="value">- €${commissioniPrelievoVal.toFixed(2)}</span></div>
+            <div class="row"><span class="label">Commissioni prelievo (1.5% + ${numeroPrelievi}×1€)</span><span class="value">- €${commissioniPrelievoVal.toFixed(2)}</span></div>
             <div class="row"><span class="label">Totale netto EUR (incassato)</span><span class="value" style="color: #4caf50;">€${(totNettoEUR - commissioniPrelievoVal).toFixed(2)}</span></div>
           </div>
           
@@ -1556,7 +1562,7 @@
             <h2>💰 Calcolo Imposte Stimate</h2>
             <div class="row"><span class="label">Reddito lordo MQL5</span><span class="value">€${totLordoEUR.toFixed(2)}</span></div>
             <div class="row"><span class="label">Commissione piattaforma deducibile (20%)</span><span class="value" style="color: #4caf50;">- €${commissioneMQL5.toFixed(2)}</span></div>
-            <div class="row"><span class="label">Commissioni prelievo deducibili</span><span class="value" style="color: #4caf50;">- €${commissioniPrelievoVal.toFixed(2)}</span></div>
+            <div class="row"><span class="label">Commissioni prelievo deducibili (1.5% + ${numeroPrelievi}×1€)</span><span class="value" style="color: #4caf50;">- €${commissioniPrelievoVal.toFixed(2)}</span></div>
             <div class="row"><span class="label">Reddito imponibile MQL5</span><span class="value">€${redditoImponibileMQL5.toFixed(2)}</span></div>
             <div class="row"><span class="label">Altri redditi dichiarati</span><span class="value">€${altriRedditiVal.toFixed(2)}</span></div>
             <div class="row"><span class="label">Reddito complessivo</span><span class="value">€${redditoTotale.toFixed(2)}</span></div>
