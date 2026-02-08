@@ -259,6 +259,9 @@
     .type-paid { background: rgba(255, 215, 0, 0.15); color: #ffd700; }
     .type-free { background: rgba(34, 197, 94, 0.15); color: #22c55e; }
     
+    .product-ea { background: rgba(168, 85, 247, 0.15); color: #a855f7; }
+    .product-signal { background: rgba(236, 72, 153, 0.15); color: #ec4899; }
+    
     /* Login */
     .login-box {
       max-width: 400px;
@@ -412,6 +415,14 @@
             <div class="stat-label">Private</div>
           </div>
           <div class="stat-card">
+            <div class="stat-number" style="color:#a855f7;" id="statEA">0</div>
+            <div class="stat-label">EA Sales</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-number" style="color:#ec4899;" id="statSignal">0</div>
+            <div class="stat-label">Signal Subs</div>
+          </div>
+          <div class="stat-card">
             <div class="stat-number green" id="statTotaleEUR">€0</div>
             <div class="stat-label">Totale Netto EUR</div>
           </div>
@@ -427,6 +438,8 @@
             <option value="2027">2027</option>
           </select>
           <button class="btn btn-secondary" onclick="toggleSaleForm()">+ Aggiungi Vendita</button>
+          <input type="file" id="importMQL5File" accept=".json" style="display:none;" onchange="importMQL5JSON(event)">
+          <button class="btn btn-secondary" onclick="document.getElementById('importMQL5File').click()">📥 Importa JSON MQL5</button>
         </div>
         
         <!-- Add Sale Form -->
@@ -440,8 +453,10 @@
             <div class="form-group">
               <label>Prodotto</label>
               <select id="saleProduct">
-                <option value="XAU_AutoTrader">XAU_AutoTrader</option>
-                <option value="BTC_AutoTrader">BTC_AutoTrader</option>
+                <option value="XAU_AutoTrader">XAU AutoTrader (EA)</option>
+                <option value="BTC_AutoTrader">BTC AutoTrader (EA)</option>
+                <option value="XAU_Signal">XAU Signal</option>
+                <option value="BTC_Signal">BTC Signal</option>
               </select>
             </div>
             <div class="form-group">
@@ -565,8 +580,10 @@
             <div class="form-group">
               <label>Prodotto EA</label>
               <select id="licProduct">
-                <option value="XAU_AutoTrader">XAU_AutoTrader</option>
-                <option value="BTC_AutoTrader">BTC_AutoTrader</option>
+                <option value="XAU_AutoTrader">XAU AutoTrader (EA)</option>
+                <option value="BTC_AutoTrader">BTC AutoTrader (EA)</option>
+                <option value="XAU_Signal">XAU Signal</option>
+                <option value="BTC_Signal">BTC Signal</option>
               </select>
             </div>
             <div class="form-group">
@@ -811,10 +828,14 @@
         return;
       }
       
-      tbody.innerHTML = sales.map(s => `
+      tbody.innerHTML = sales.map(s => {
+        const isSignal = s.ea_product.includes('Signal');
+        const productLabel = s.ea_product.replace('_', ' ');
+        const productClass = isSignal ? 'product-signal' : 'product-ea';
+        return `
         <tr>
           <td>${formatDate(s.sale_date)}</td>
-          <td>${s.ea_product.replace('_', ' ')}</td>
+          <td><span class="source-badge ${productClass}">${productLabel}</span></td>
           <td><span class="source-badge source-${s.source}">${s.source === 'market' ? 'Market' : 'Private'}</span></td>
           <td class="text-right mono">$${s.amount_usd.toFixed(2)}</td>
           <td class="text-right mono">${s.exchange_rate.toFixed(4)}</td>
@@ -822,7 +843,7 @@
           <td class="text-right mono green">€${s.amount_eur_net.toFixed(2)}</td>
           <td><button class="btn btn-danger" onclick="deleteSale(${s.id})">🗑️</button></td>
         </tr>
-      `).join('');
+      `}).join('');
       
       updateSalesStats();
     }
@@ -830,11 +851,15 @@
     function updateSalesStats() {
       const market = sales.filter(s => s.source === 'market');
       const priv = sales.filter(s => s.source === 'private');
+      const eaSales = sales.filter(s => s.ea_product.includes('AutoTrader'));
+      const signalSales = sales.filter(s => s.ea_product.includes('Signal'));
       const totalNet = sales.reduce((sum, s) => sum + s.amount_eur_net, 0);
       
       $('statTotaleSales').textContent = sales.length;
       $('statMarket').textContent = market.length;
       $('statPrivate').textContent = priv.length;
+      $('statEA').textContent = eaSales.length;
+      $('statSignal').textContent = signalSales.length;
       $('statTotaleEUR').textContent = '€' + totalNet.toFixed(0);
     }
     
@@ -1330,6 +1355,81 @@
       if (!confirm('🚨 ULTIMA CONFERMA: Hai esportato un backup? Questa azione è IRREVERSIBILE.')) return;
       
       showStatus('⚠️ Cancellazione massiva non implementata per sicurezza. Elimina i record singolarmente.', true);
+    }
+    
+    // ==================== IMPORT MQL5 JSON ====================
+    async function importMQL5JSON(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+      
+      const reader = new FileReader();
+      reader.onload = async (e) => {
+        try {
+          const data = JSON.parse(e.target.result);
+          
+          if (!data.vendite || !Array.isArray(data.vendite)) {
+            showStatus('Formato JSON non valido', true);
+            return;
+          }
+          
+          let imported = 0;
+          let errors = 0;
+          
+          for (const v of data.vendite) {
+            // Determina il prodotto dal nome
+            let ea_product = 'BTC_AutoTrader';
+            const nome = v.nomeEA.toLowerCase();
+            
+            if (nome.includes('signal') || nome.includes('subscription')) {
+              if (nome.includes('xau')) {
+                ea_product = 'XAU_Signal';
+              } else {
+                ea_product = 'BTC_Signal';
+              }
+            } else if (nome.includes('xau')) {
+              ea_product = 'XAU_AutoTrader';
+            } else {
+              ea_product = 'BTC_AutoTrader';
+            }
+            
+            const saleData = {
+              sale_date: v.data,
+              ea_product: ea_product,
+              source: 'market',
+              amount_usd: v.importoUSD,
+              exchange_rate: v.cambioEUR,
+              notes: v.nomeEA.trim()
+            };
+            
+            try {
+              const res = await fetch('/api/admin?type=sales', {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'Authorization': `Bearer ${adminPassword}`
+                },
+                body: JSON.stringify(saleData)
+              });
+              
+              if (res.ok) {
+                imported++;
+              } else {
+                errors++;
+              }
+            } catch {
+              errors++;
+            }
+          }
+          
+          showStatus(`✅ Importate ${imported} vendite` + (errors > 0 ? ` (${errors} errori)` : ''));
+          loadSales();
+          
+        } catch (err) {
+          showStatus('Errore parsing JSON: ' + err.message, true);
+        }
+      };
+      reader.readAsText(file);
+      event.target.value = '';
     }
     
     // ==================== UTILS ====================
