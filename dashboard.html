@@ -391,6 +391,7 @@
       <div class="tabs">
         <div class="tab active" data-tab="vendite">📊 Vendite</div>
         <div class="tab" data-tab="licenze">🔑 Licenze</div>
+        <div class="tab" data-tab="codici">🎟️ Codici</div>
         <div class="tab" data-tab="tasse">💰 Tasse</div>
         <div class="tab" data-tab="export">📥 Export</div>
         <div class="tab" data-tab="settings">⚙️ Impostazioni</div>
@@ -634,6 +635,81 @@
         </div>
       </div>
 
+      <!-- ==================== CODICI TAB ==================== -->
+      <div id="tab-codici" class="panel">
+        
+        <!-- Stats -->
+        <div class="stats-grid">
+          <div class="stat-card">
+            <div class="stat-number orange" id="statTotaleCodes">0</div>
+            <div class="stat-label">Codici Totali</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-number green" id="statAvailableCodes">0</div>
+            <div class="stat-label">✅ Disponibili</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-number" style="color:#6b7280;" id="statUsedCodes">0</div>
+            <div class="stat-label">Usati</div>
+          </div>
+        </div>
+        
+        <button class="btn btn-secondary" onclick="toggleCodeForm()" style="margin-bottom:20px;">+ Crea Codice Attivazione</button>
+        
+        <!-- Create Code Form -->
+        <div id="codeForm" class="card" style="display:none;">
+          <div class="card-title">🎟️ Nuovo Codice Attivazione</div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Prodotto</label>
+              <select id="codeProduct">
+                <option value="XAU_AutoTrader">XAU AutoTrader</option>
+                <option value="BTC_AutoTrader">BTC AutoTrader</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Tipo Licenza</label>
+              <select id="codeType" onchange="toggleCodeTrialDays()">
+                <option value="trial">⏱️ Trial</option>
+                <option value="free">🎁 Free (Lifetime)</option>
+                <option value="paid">💰 Paid (Lifetime)</option>
+              </select>
+            </div>
+            <div class="form-group" id="codeTrialDaysGroup">
+              <label>Giorni Trial</label>
+              <input type="number" id="codeTrialDays" value="30" min="1" max="365">
+            </div>
+          </div>
+          <div class="btn-group">
+            <button class="btn btn-primary" onclick="createCode()">🎟️ Genera Codice</button>
+            <button class="btn btn-secondary" onclick="toggleCodeForm()">Annulla</button>
+          </div>
+        </div>
+        
+        <!-- Codes Table -->
+        <div class="card">
+          <div class="card-title">🎟️ Codici Attivazione</div>
+          <div class="table-container">
+            <table>
+              <thead>
+                <tr>
+                  <th>Codice</th>
+                  <th>Prodotto</th>
+                  <th>Tipo</th>
+                  <th>Giorni</th>
+                  <th>Stato</th>
+                  <th>Link</th>
+                  <th>Azioni</th>
+                </tr>
+              </thead>
+              <tbody id="codesTable">
+                <tr><td colspan="7" style="text-align:center;color:rgba(255,255,255,0.4);">Caricamento...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
       <!-- ==================== TASSE TAB ==================== -->
       <div id="tab-tasse" class="panel">
         
@@ -848,6 +924,7 @@
         
         if (tab.dataset.tab === 'tasse') loadTaxData();
         if (tab.dataset.tab === 'settings') loadSettings();
+        if (tab.dataset.tab === 'codici') loadCodes();
       });
     });
     
@@ -1463,6 +1540,135 @@
       if (!confirm('🚨 ULTIMA CONFERMA: Hai esportato un backup? Questa azione è IRREVERSIBILE.')) return;
       
       showStatus('⚠️ Cancellazione massiva non implementata per sicurezza. Elimina i record singolarmente.', true);
+    }
+    
+    // ==================== ACTIVATION CODES ====================
+    let codes = [];
+    
+    async function loadCodes() {
+      try {
+        const res = await fetch('/api/admin?type=codes', {
+          headers: { 'Authorization': `Bearer ${adminPassword}` }
+        });
+        codes = await res.json();
+        renderCodes();
+      } catch (err) {
+        console.error(err);
+        showStatus('Errore caricamento codici', true);
+      }
+    }
+    
+    function renderCodes() {
+      const tbody = $('codesTable');
+      
+      if (codes.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:rgba(255,255,255,0.4);">Nessun codice creato</td></tr>';
+        updateCodeStats();
+        return;
+      }
+      
+      const baseUrl = window.location.origin;
+      
+      tbody.innerHTML = codes.map(c => {
+        const typeLabel = c.license_type === 'trial' ? '⏱️ Trial' : (c.license_type === 'free' ? '🎁 Free' : '💰 Paid');
+        const typeClass = 'type-' + c.license_type;
+        const statusLabel = c.used ? '<span style="color:#6b7280;">✓ Usato</span>' : '<span style="color:#22c55e;">✅ Disponibile</span>';
+        const days = c.trial_days || '-';
+        const link = `${baseUrl}/activate.html?code=${c.code}`;
+        
+        return `
+        <tr>
+          <td class="mono" style="font-weight:600;color:#00FF41;">${c.code}</td>
+          <td>${c.product.replace('_', ' ')}</td>
+          <td><span class="source-badge ${typeClass}">${typeLabel}</span></td>
+          <td>${days}</td>
+          <td>${statusLabel}</td>
+          <td>
+            ${c.used ? `<span style="color:#6b7280;font-size:12px;">${c.used_by_name || ''}</span>` : 
+              `<button class="btn btn-secondary" style="padding:4px 8px;font-size:11px;" onclick="copyLink('${link}')">📋 Copia Link</button>`}
+          </td>
+          <td><button class="btn btn-danger" onclick="deleteCode(${c.id})">🗑️</button></td>
+        </tr>
+      `}).join('');
+      
+      updateCodeStats();
+    }
+    
+    function updateCodeStats() {
+      const available = codes.filter(c => !c.used);
+      const used = codes.filter(c => c.used);
+      
+      $('statTotaleCodes').textContent = codes.length;
+      $('statAvailableCodes').textContent = available.length;
+      $('statUsedCodes').textContent = used.length;
+    }
+    
+    function toggleCodeForm() {
+      const form = $('codeForm');
+      form.style.display = form.style.display === 'none' ? 'block' : 'none';
+      if (form.style.display === 'block') {
+        $('codeType').value = 'trial';
+        $('codeTrialDays').value = '30';
+        toggleCodeTrialDays();
+      }
+    }
+    
+    function toggleCodeTrialDays() {
+      const isTrial = $('codeType').value === 'trial';
+      $('codeTrialDaysGroup').style.display = isTrial ? 'block' : 'none';
+    }
+    
+    async function createCode() {
+      const codeData = {
+        product: $('codeProduct').value,
+        license_type: $('codeType').value,
+        trial_days: parseInt($('codeTrialDays').value) || 30
+      };
+      
+      try {
+        const res = await fetch('/api/admin?type=codes', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${adminPassword}`
+          },
+          body: JSON.stringify(codeData)
+        });
+        
+        if (res.ok) {
+          const data = await res.json();
+          showStatus(`✅ Codice creato: ${data.code.code}`);
+          toggleCodeForm();
+          loadCodes();
+        } else {
+          showStatus('Errore creazione codice', true);
+        }
+      } catch (err) {
+        showStatus('Errore di rete', true);
+      }
+    }
+    
+    async function deleteCode(id) {
+      if (!confirm('Eliminare questo codice?')) return;
+      
+      try {
+        const res = await fetch(`/api/admin?type=codes&id=${id}`, {
+          method: 'DELETE',
+          headers: { 'Authorization': `Bearer ${adminPassword}` }
+        });
+        
+        if (res.ok) {
+          showStatus('✅ Codice eliminato');
+          loadCodes();
+        }
+      } catch (err) {
+        showStatus('Errore eliminazione', true);
+      }
+    }
+    
+    function copyLink(link) {
+      navigator.clipboard.writeText(link);
+      showStatus('✅ Link copiato negli appunti!');
     }
     
     // ==================== SETTINGS ====================

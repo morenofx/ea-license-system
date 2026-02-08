@@ -300,6 +300,70 @@ export default async function handler(req, res) {
       }
     }
 
+    // ==================== ACTIVATION CODES ====================
+    if (type === 'codes') {
+      // GET - List codes
+      if (req.method === 'GET') {
+        const { data, error } = await supabase
+          .from('activation_codes')
+          .select('*')
+          .order('created_at', { ascending: false });
+
+        if (error) throw error;
+        return res.status(200).json(data || []);
+      }
+
+      // POST - Create new code
+      if (req.method === 'POST') {
+        const { product, license_type, trial_days } = req.body;
+
+        if (!product || !license_type) {
+          return res.status(400).json({ error: 'Missing required fields' });
+        }
+
+        // Generate unique code
+        const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+        let code = '';
+        for (let i = 0; i < 8; i++) {
+          code += chars.charAt(Math.floor(Math.random() * chars.length));
+        }
+
+        const codeData = {
+          code: code,
+          product: product,
+          license_type: license_type,
+          trial_days: license_type === 'trial' ? (trial_days || 7) : null,
+          used: false
+        };
+
+        const { data, error } = await supabase
+          .from('activation_codes')
+          .insert([codeData])
+          .select()
+          .single();
+
+        if (error) throw error;
+        return res.status(201).json({ success: true, code: data });
+      }
+
+      // DELETE - Delete code
+      if (req.method === 'DELETE') {
+        const { id } = req.query;
+
+        if (!id) {
+          return res.status(400).json({ error: 'Missing id' });
+        }
+
+        const { error } = await supabase
+          .from('activation_codes')
+          .delete()
+          .eq('id', id);
+
+        if (error) throw error;
+        return res.status(200).json({ success: true });
+      }
+    }
+
     return res.status(405).json({ error: 'Method not allowed' });
 
   } catch (err) {

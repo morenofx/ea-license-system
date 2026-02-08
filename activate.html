@@ -1,0 +1,547 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Activate License - Smart Trading Bots</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🤖</text></svg>">
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    
+    body {
+      min-height: 100vh;
+      background: #0a0a0f;
+      font-family: 'IBM Plex Sans', -apple-system, sans-serif;
+      color: #e6edf3;
+      padding: 24px 16px;
+    }
+    
+    .container { max-width: 550px; margin: 0 auto; }
+    
+    .header { text-align: center; margin-bottom: 32px; }
+    
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: rgba(0, 255, 65, 0.1);
+      border: 1px solid rgba(0, 255, 65, 0.2);
+      border-radius: 100px;
+      padding: 8px 20px;
+      margin-bottom: 16px;
+      font-size: 13px;
+      font-weight: 500;
+      color: #00FF41;
+    }
+    
+    h1 {
+      font-size: 28px;
+      font-weight: 700;
+      color: #fff;
+      margin-bottom: 8px;
+    }
+    
+    .subtitle { font-size: 14px; color: rgba(255,255,255,0.5); }
+    
+    .card {
+      background: #12121a;
+      border: 1px solid #333;
+      border-radius: 16px;
+      padding: 24px;
+      margin-bottom: 20px;
+    }
+    
+    .card-title {
+      font-size: 16px;
+      font-weight: 600;
+      color: #00FF41;
+      margin-bottom: 16px;
+    }
+    
+    /* License Info */
+    .license-info {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin-bottom: 20px;
+    }
+    
+    .info-item {
+      background: #0a0a0f;
+      border-radius: 8px;
+      padding: 16px;
+      text-align: center;
+    }
+    
+    .info-label {
+      font-size: 12px;
+      color: rgba(255,255,255,0.5);
+      margin-bottom: 4px;
+    }
+    
+    .info-value {
+      font-size: 18px;
+      font-weight: 600;
+      color: #fff;
+    }
+    
+    .info-value.trial { color: #f59e0b; }
+    .info-value.free { color: #22c55e; }
+    .info-value.paid { color: #ffd700; }
+    
+    /* Form */
+    .form-group { margin-bottom: 16px; }
+    
+    label {
+      display: block;
+      font-size: 13px;
+      color: rgba(255,255,255,0.6);
+      margin-bottom: 6px;
+      font-weight: 500;
+    }
+    
+    input {
+      width: 100%;
+      background: #0a0a0f;
+      border: 1px solid #333;
+      border-radius: 8px;
+      padding: 14px 16px;
+      color: #fff;
+      font-size: 15px;
+      font-family: 'IBM Plex Sans', sans-serif;
+      transition: all 0.2s;
+    }
+    
+    input:focus {
+      outline: none;
+      border-color: #00FF41;
+      box-shadow: 0 0 0 3px rgba(0, 255, 65, 0.15);
+    }
+    
+    input::placeholder { color: rgba(255,255,255,0.3); }
+    
+    .help-text {
+      font-size: 12px;
+      color: rgba(255,255,255,0.4);
+      margin-top: 6px;
+    }
+    
+    /* Button */
+    .btn {
+      width: 100%;
+      padding: 16px 24px;
+      border-radius: 8px;
+      font-weight: 600;
+      font-size: 16px;
+      cursor: pointer;
+      transition: all 0.2s;
+      border: none;
+      font-family: 'IBM Plex Sans', sans-serif;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+    
+    .btn-primary {
+      background: #00FF41;
+      color: #0a0a0f;
+    }
+    
+    .btn-primary:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 0 20px rgba(0, 255, 65, 0.4);
+    }
+    
+    .btn-primary:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+      transform: none;
+      box-shadow: none;
+    }
+    
+    .btn-download {
+      background: #3b82f6;
+      color: #fff;
+      text-decoration: none;
+      margin-bottom: 10px;
+    }
+    
+    .btn-download:hover {
+      background: #2563eb;
+      transform: translateY(-1px);
+    }
+    
+    /* Status */
+    .status {
+      padding: 12px 16px;
+      border-radius: 8px;
+      margin-bottom: 16px;
+      font-size: 14px;
+      display: none;
+    }
+    
+    .status.error {
+      display: block;
+      background: rgba(239, 68, 68, 0.1);
+      border: 1px solid rgba(239, 68, 68, 0.3);
+      color: #ef4444;
+    }
+    
+    .status.success {
+      display: block;
+      background: rgba(34, 197, 94, 0.1);
+      border: 1px solid rgba(34, 197, 94, 0.3);
+      color: #22c55e;
+    }
+    
+    /* Error/Invalid page */
+    .error-box {
+      text-align: center;
+      padding: 60px 20px;
+    }
+    
+    .error-icon {
+      font-size: 64px;
+      margin-bottom: 20px;
+    }
+    
+    .error-box h2 {
+      color: #ef4444;
+      margin-bottom: 12px;
+    }
+    
+    /* Success/Download page */
+    .success-box {
+      text-align: center;
+    }
+    
+    .success-icon {
+      font-size: 64px;
+      margin-bottom: 20px;
+    }
+    
+    .success-box h2 {
+      color: #00FF41;
+      margin-bottom: 16px;
+    }
+    
+    .download-section {
+      margin-top: 24px;
+      padding-top: 24px;
+      border-top: 1px solid #333;
+    }
+    
+    .instructions {
+      background: #0a0a0f;
+      border-radius: 12px;
+      padding: 20px;
+      margin-top: 20px;
+      text-align: left;
+    }
+    
+    .instructions h3 {
+      color: #00FF41;
+      margin-bottom: 12px;
+      font-size: 14px;
+    }
+    
+    .instructions ol {
+      margin-left: 20px;
+      color: rgba(255,255,255,0.7);
+      font-size: 14px;
+      line-height: 1.8;
+    }
+    
+    .spinner {
+      width: 20px;
+      height: 20px;
+      border: 2px solid transparent;
+      border-top-color: #0a0a0f;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+    
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+    
+    .loading-page {
+      text-align: center;
+      padding: 60px 20px;
+    }
+    
+    .loading-page .spinner {
+      width: 40px;
+      height: 40px;
+      border-width: 3px;
+      border-top-color: #00FF41;
+      margin: 0 auto 20px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    
+    <!-- Header -->
+    <div class="header">
+      <div class="badge">🤖 SMART TRADING BOTS</div>
+      <h1>Activate License</h1>
+      <p class="subtitle">Enter your details to activate your EA license</p>
+    </div>
+    
+    <!-- Loading -->
+    <div id="loadingPage" class="card loading-page">
+      <div class="spinner"></div>
+      <p>Loading activation code...</p>
+    </div>
+    
+    <!-- Error: Invalid/Used Code -->
+    <div id="errorPage" class="card error-box" style="display:none;">
+      <div class="error-icon">❌</div>
+      <h2 id="errorTitle">Invalid Code</h2>
+      <p id="errorMessage" style="color:rgba(255,255,255,0.6);">This activation code is invalid or has already been used.</p>
+    </div>
+    
+    <!-- Activation Form -->
+    <div id="activationForm" style="display:none;">
+      <div id="statusMsg" class="status"></div>
+      
+      <!-- License Info -->
+      <div class="card">
+        <div class="card-title">📋 Your License</div>
+        <div class="license-info">
+          <div class="info-item">
+            <div class="info-label">Product</div>
+            <div class="info-value" id="infoProduct">XAU AutoTrader</div>
+          </div>
+          <div class="info-item">
+            <div class="info-label">License Type</div>
+            <div class="info-value" id="infoType">Trial</div>
+          </div>
+        </div>
+        <div id="trialInfo" style="text-align:center;color:#f59e0b;font-size:14px;display:none;">
+          ⏱️ Valid for <strong id="infoDays">30</strong> days after activation
+        </div>
+      </div>
+      
+      <!-- Form -->
+      <div class="card">
+        <div class="card-title">👤 Your Information</div>
+        <div class="form-group">
+          <label>Full Name *</label>
+          <input type="text" id="clientName" placeholder="Mario Rossi" required>
+        </div>
+        <div class="form-group">
+          <label>MT4/MT5 Account Number *</label>
+          <input type="text" id="accountNumber" placeholder="12345678" required>
+          <div class="help-text">Find this in your MetaTrader terminal: Help → About</div>
+        </div>
+        
+        <button class="btn btn-primary" id="activateBtn" onclick="activateLicense()">
+          <span id="btnText">🚀 Activate License</span>
+          <div class="spinner" id="btnSpinner" style="display:none;"></div>
+        </button>
+      </div>
+    </div>
+    
+    <!-- Success: Download Page -->
+    <div id="successPage" class="card success-box" style="display:none;">
+      <div class="success-icon">✅</div>
+      <h2>License Activated!</h2>
+      <p style="color:rgba(255,255,255,0.6);margin-bottom:8px;">
+        Your license has been successfully activated.
+      </p>
+      
+      <div class="license-info" style="margin-top:20px;">
+        <div class="info-item">
+          <div class="info-label">Account</div>
+          <div class="info-value" id="successAccount">12345678</div>
+        </div>
+        <div class="info-item">
+          <div class="info-label">Expires</div>
+          <div class="info-value" id="successExpires">Lifetime</div>
+        </div>
+      </div>
+      
+      <div class="download-section">
+        <div class="card-title">📥 Download EA</div>
+        <a href="#" id="downloadMT5" class="btn btn-download">⬇️ Download for MT5</a>
+        <a href="#" id="downloadMT4" class="btn btn-download">⬇️ Download for MT4</a>
+        
+        <div class="instructions">
+          <h3>📖 Installation Instructions</h3>
+          <ol>
+            <li>Download the EA file for your platform (MT4 or MT5)</li>
+            <li>Open MetaTrader → File → Open Data Folder</li>
+            <li>Go to <strong>MQL5/Experts</strong> (or MQL4/Experts)</li>
+            <li>Copy the downloaded .ex5 (or .ex4) file there</li>
+            <li>Restart MetaTrader</li>
+            <li>Find the EA in Navigator → Expert Advisors</li>
+            <li>Drag it onto a chart and enable AutoTrading</li>
+          </ol>
+        </div>
+      </div>
+    </div>
+    
+  </div>
+
+  <script>
+    let activationCode = '';
+    let codeData = null;
+    
+    // Get code from URL
+    function getCodeFromURL() {
+      const params = new URLSearchParams(window.location.search);
+      return params.get('code') || '';
+    }
+    
+    // Load code info
+    async function loadCode() {
+      activationCode = getCodeFromURL();
+      
+      if (!activationCode) {
+        showError('No Code Provided', 'Please use the activation link provided to you.');
+        return;
+      }
+      
+      try {
+        const res = await fetch(`/api/activate?code=${activationCode}`);
+        const data = await res.json();
+        
+        if (!res.ok || data.error) {
+          if (data.used) {
+            showError('Code Already Used', 'This activation code has already been used.');
+          } else {
+            showError('Invalid Code', 'This activation code is invalid or expired.');
+          }
+          return;
+        }
+        
+        codeData = data;
+        showActivationForm();
+        
+      } catch (err) {
+        showError('Connection Error', 'Unable to verify activation code. Please try again.');
+      }
+    }
+    
+    function showError(title, message) {
+      document.getElementById('loadingPage').style.display = 'none';
+      document.getElementById('errorPage').style.display = 'block';
+      document.getElementById('errorTitle').textContent = title;
+      document.getElementById('errorMessage').textContent = message;
+    }
+    
+    function showActivationForm() {
+      document.getElementById('loadingPage').style.display = 'none';
+      document.getElementById('activationForm').style.display = 'block';
+      
+      // Fill info
+      const product = codeData.product.replace('_', ' ');
+      document.getElementById('infoProduct').textContent = product;
+      
+      const typeEl = document.getElementById('infoType');
+      if (codeData.license_type === 'trial') {
+        typeEl.textContent = '⏱️ Trial';
+        typeEl.className = 'info-value trial';
+        document.getElementById('trialInfo').style.display = 'block';
+        document.getElementById('infoDays').textContent = codeData.trial_days || 30;
+      } else if (codeData.license_type === 'free') {
+        typeEl.textContent = '🎁 Free';
+        typeEl.className = 'info-value free';
+      } else {
+        typeEl.textContent = '💰 Paid';
+        typeEl.className = 'info-value paid';
+      }
+    }
+    
+    function showStatus(msg, isError = false) {
+      const el = document.getElementById('statusMsg');
+      el.textContent = msg;
+      el.className = 'status ' + (isError ? 'error' : 'success');
+    }
+    
+    function setLoading(loading) {
+      const btn = document.getElementById('activateBtn');
+      const text = document.getElementById('btnText');
+      const spinner = document.getElementById('btnSpinner');
+      
+      btn.disabled = loading;
+      text.style.display = loading ? 'none' : 'inline';
+      spinner.style.display = loading ? 'block' : 'none';
+    }
+    
+    async function activateLicense() {
+      const clientName = document.getElementById('clientName').value.trim();
+      const accountNumber = document.getElementById('accountNumber').value.trim();
+      
+      if (!clientName || !accountNumber) {
+        showStatus('Please fill in all fields', true);
+        return;
+      }
+      
+      if (accountNumber.length < 5) {
+        showStatus('Please enter a valid account number', true);
+        return;
+      }
+      
+      setLoading(true);
+      
+      try {
+        const res = await fetch('/api/activate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            code: activationCode,
+            client_name: clientName,
+            account_number: accountNumber
+          })
+        });
+        
+        const data = await res.json();
+        
+        if (!res.ok) {
+          throw new Error(data.error || 'Activation failed');
+        }
+        
+        showSuccessPage(data);
+        
+      } catch (err) {
+        showStatus(err.message, true);
+        setLoading(false);
+      }
+    }
+    
+    function showSuccessPage(data) {
+      document.getElementById('activationForm').style.display = 'none';
+      document.getElementById('successPage').style.display = 'block';
+      
+      document.getElementById('successAccount').textContent = data.account_number;
+      
+      if (data.expires_at) {
+        const expires = new Date(data.expires_at);
+        document.getElementById('successExpires').textContent = expires.toLocaleDateString();
+      } else {
+        document.getElementById('successExpires').textContent = 'Lifetime';
+      }
+      
+      // Set download links
+      const baseUrl = window.location.origin;
+      const product = codeData.product;
+      
+      if (product.includes('XAU')) {
+        document.getElementById('downloadMT5').href = `${baseUrl}/downloads/XAU_AutoTrader_Online_MT5.ex5`;
+        document.getElementById('downloadMT4').href = `${baseUrl}/downloads/XAU_AutoTrader_Online_MT4.ex4`;
+      } else {
+        document.getElementById('downloadMT5').href = `${baseUrl}/downloads/BTC_AutoTrader_Online_MT5.ex5`;
+        document.getElementById('downloadMT4').href = `${baseUrl}/downloads/BTC_AutoTrader_Online_MT4.ex4`;
+      }
+    }
+    
+    // Init
+    loadCode();
+  </script>
+</body>
+</html>
