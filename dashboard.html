@@ -930,9 +930,12 @@
         const tabId = 'tab-' + tab.dataset.tab;
         $(tabId).classList.add('active');
         
+        // Refresh dati quando cambi tab
+        if (tab.dataset.tab === 'vendite') loadSales();
+        if (tab.dataset.tab === 'licenze') loadLicenses();
+        if (tab.dataset.tab === 'codici') loadCodes();
         if (tab.dataset.tab === 'tasse') loadTaxData();
         if (tab.dataset.tab === 'settings') loadSettings();
-        if (tab.dataset.tab === 'codici') loadCodes();
       });
     });
     
