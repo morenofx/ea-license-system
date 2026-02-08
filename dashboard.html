@@ -2967,103 +2967,158 @@
     
     // Funzioni download diretto (senza anteprima)
     function downloadMT5RT(year) {
+      const { jsPDF } = window.jspdf;
+      const doc = new jsPDF();
       const data = mt5YearlyData[year];
       if (!data) return;
       
       const t = data.totals;
       const imposta = t.netProfit > 0 ? t.netProfit * 0.26 : 0;
       
-      let accountsHTML = '';
+      // Header
+      doc.setFontSize(20);
+      doc.setTextColor(30, 64, 175);
+      doc.text('QUADRO RT - PLUSVALENZE FINANZIARIE', 105, 25, { align: 'center' });
+      
+      doc.setFontSize(12);
+      doc.setTextColor(100, 100, 100);
+      doc.text(`Anno d'imposta: ${year} - Generato il ${new Date().toLocaleDateString('it-IT')}`, 105, 35, { align: 'center' });
+      
+      // Box riepilogo
+      doc.setFillColor(248, 250, 252);
+      doc.roundedRect(15, 45, 180, 45, 3, 3, 'F');
+      
+      doc.setFontSize(11);
+      doc.setTextColor(0, 0, 0);
+      doc.text(`Totale Corrispettivi (RT21): €${(t.grossProfit + Math.abs(t.grossLoss)).toFixed(2)}`, 25, 58);
+      doc.text(`Totale Costi (RT22): €${Math.abs(t.grossLoss).toFixed(2)}`, 25, 70);
+      doc.text(`Plusvalenza Netta (RT23): €${t.netProfit.toFixed(2)}`, 25, 82);
+      
+      // Box imposta
+      doc.setFillColor(254, 226, 226);
+      doc.setDrawColor(239, 68, 68);
+      doc.roundedRect(15, 98, 180, 30, 3, 3, 'FD');
+      
+      doc.setFontSize(12);
+      doc.setTextColor(100, 100, 100);
+      doc.text('IMPOSTA SOSTITUTIVA 26% (RT26)', 105, 110, { align: 'center' });
+      
+      doc.setFontSize(24);
+      doc.setTextColor(220, 38, 38);
+      doc.text(`€${imposta.toFixed(2)}`, 105, 122, { align: 'center' });
+      
+      // Tabella account
+      let y = 145;
+      doc.setFontSize(12);
+      doc.setTextColor(0, 0, 0);
+      doc.text('DETTAGLIO PER ACCOUNT', 15, y);
+      y += 10;
+      
+      // Header tabella
+      doc.setFillColor(226, 232, 240);
+      doc.rect(15, y - 5, 180, 8, 'F');
+      doc.setFontSize(9);
+      doc.text('Account', 18, y);
+      doc.text('Broker', 50, y);
+      doc.text('Valuta', 100, y);
+      doc.text('Profitto', 125, y);
+      doc.text('Netto', 155, y);
+      doc.text('Imposta', 180, y);
+      y += 10;
+      
+      // Righe account
+      doc.setFontSize(9);
       Object.values(data.accounts).forEach(acc => {
         const impAcc = acc.netProfitEUR > 0 ? acc.netProfitEUR * 0.26 : 0;
-        accountsHTML += `<tr><td>${acc.accountNumber}</td><td>${acc.company}</td><td>${acc.currency}</td><td style="text-align:right;">€${acc.grossProfitEUR.toFixed(2)}</td><td style="text-align:right;">€${Math.abs(acc.grossLossEUR).toFixed(2)}</td><td style="text-align:right;font-weight:bold;">€${acc.netProfitEUR.toFixed(2)}</td><td style="text-align:right;">€${impAcc.toFixed(2)}</td></tr>`;
+        doc.text(acc.accountNumber, 18, y);
+        doc.text(acc.company.substring(0, 20), 50, y);
+        doc.text(acc.currency, 100, y);
+        doc.text(`€${acc.grossProfitEUR.toFixed(2)}`, 125, y);
+        doc.text(`€${acc.netProfitEUR.toFixed(2)}`, 155, y);
+        doc.text(`€${impAcc.toFixed(2)}`, 180, y);
+        y += 8;
       });
       
-      const html = `<div style="font-family:Segoe UI,Arial;padding:40px;max-width:800px;margin:0 auto;">
-        <div style="text-align:center;border-bottom:3px solid #3b82f6;padding-bottom:20px;margin-bottom:30px;">
-          <h1 style="color:#1e40af;margin:0;">📊 QUADRO RT - PLUSVALENZE</h1>
-          <p style="color:#666;margin-top:8px;">Anno ${year} • ${new Date().toLocaleDateString('it-IT')}</p>
-        </div>
-        <div style="background:#f8fafc;padding:20px;border-radius:12px;margin-bottom:20px;">
-          <p><strong>Totale Corrispettivi (RT21):</strong> €${(t.grossProfit + Math.abs(t.grossLoss)).toFixed(2)}</p>
-          <p><strong>Totale Costi (RT22):</strong> €${Math.abs(t.grossLoss).toFixed(2)}</p>
-          <p><strong>Plusvalenza Netta (RT23):</strong> €${t.netProfit.toFixed(2)}</p>
-        </div>
-        <div style="background:#fee2e2;border:2px solid #ef4444;padding:20px;border-radius:12px;text-align:center;margin-bottom:20px;">
-          <p style="color:#666;margin:0;">IMPOSTA SOSTITUTIVA 26% (RT26)</p>
-          <p style="font-size:32px;font-weight:bold;color:#dc2626;margin:8px 0;">€${imposta.toFixed(2)}</p>
-        </div>
-        <table style="width:100%;border-collapse:collapse;font-size:13px;">
-          <thead><tr style="background:#e2e8f0;"><th style="padding:10px;text-align:left;">Account</th><th>Broker</th><th>Valuta</th><th>Profitti</th><th>Perdite</th><th>Netto</th><th>Imposta</th></tr></thead>
-          <tbody>${accountsHTML}</tbody>
-        </table>
-        <p style="margin-top:30px;font-size:12px;color:#888;text-align:center;">⚠️ Documento indicativo - Consultare un commercialista</p>
-      </div>`;
+      // Footer
+      doc.setFontSize(8);
+      doc.setTextColor(150, 150, 150);
+      doc.text('Documento indicativo - Consultare un commercialista per la dichiarazione ufficiale', 105, 280, { align: 'center' });
       
-      const container = document.createElement('div');
-      container.style.position = 'absolute';
-      container.style.left = '-9999px';
-      container.innerHTML = html;
-      document.body.appendChild(container);
-      
-      setTimeout(() => {
-        html2pdf().set({
-          margin: 10,
-          filename: `Quadro_RT_${year}.pdf`,
-          image: { type: 'jpeg', quality: 0.98 },
-          html2canvas: { scale: 2, useCORS: true, logging: false },
-          jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
-        }).from(container).save().then(() => {
-          document.body.removeChild(container);
-        });
-      }, 100);
+      doc.save(`Quadro_RT_${year}.pdf`);
     }
     
     function downloadMT5RW(year) {
+      const { jsPDF } = window.jspdf;
+      const doc = new jsPDF();
       const data = mt5YearlyData[year];
       if (!data) return;
       
-      let accountsHTML = '';
+      // Header
+      doc.setFontSize(20);
+      doc.setTextColor(22, 163, 74);
+      doc.text('QUADRO RW - MONITORAGGIO FISCALE', 105, 25, { align: 'center' });
+      
+      doc.setFontSize(12);
+      doc.setTextColor(100, 100, 100);
+      doc.text(`Anno d'imposta: ${year} - Generato il ${new Date().toLocaleDateString('it-IT')}`, 105, 35, { align: 'center' });
+      
+      let y = 50;
+      
+      // Account boxes
       Object.values(data.accounts).forEach((acc, idx) => {
-        accountsHTML += `<div style="background:#f0fdf4;border:2px solid #22c55e;border-radius:12px;padding:20px;margin-bottom:16px;">
-          <h3 style="color:#16a34a;margin:0 0 12px 0;">Account #${idx + 1}: ${acc.accountNumber}</h3>
-          <p><strong>Broker:</strong> ${acc.company} | <strong>Paese:</strong> ${acc.countryInfo.name} (${acc.countryInfo.code})</p>
-          <p><strong>Valuta:</strong> ${acc.currency} | <strong>Giorni:</strong> ${acc.giorni}</p>
-          <p><strong>Valore Iniziale:</strong> €${acc.valoreInizialeEUR.toFixed(2)} | <strong>Valore Finale:</strong> €${acc.valoreFinaleEUR.toFixed(2)}</p>
-          <p style="text-align:right;font-size:18px;font-weight:bold;color:#ca8a04;margin-top:12px;">IVAFE: €${acc.ivafe.toFixed(2)}</p>
-        </div>`;
+        doc.setFillColor(240, 253, 244);
+        doc.setDrawColor(34, 197, 94);
+        doc.roundedRect(15, y, 180, 45, 3, 3, 'FD');
+        
+        doc.setFontSize(12);
+        doc.setTextColor(22, 101, 52);
+        doc.text(`Account #${idx + 1}: ${acc.accountNumber}`, 20, y + 10);
+        
+        doc.setFontSize(10);
+        doc.setTextColor(0, 0, 0);
+        doc.text(`Broker: ${acc.company}`, 20, y + 20);
+        doc.text(`Paese: ${acc.countryInfo.name} (Codice: ${acc.countryInfo.code})`, 20, y + 28);
+        doc.text(`Valuta: ${acc.currency} | Giorni: ${acc.giorni}`, 20, y + 36);
+        
+        doc.text(`Valore Iniziale: €${acc.valoreInizialeEUR.toFixed(2)}`, 110, y + 20);
+        doc.text(`Valore Finale: €${acc.valoreFinaleEUR.toFixed(2)}`, 110, y + 28);
+        
+        doc.setFontSize(12);
+        doc.setTextColor(202, 138, 4);
+        doc.text(`IVAFE: €${acc.ivafe.toFixed(2)}`, 110, y + 38);
+        
+        y += 52;
       });
       
-      const html = `<div style="font-family:Segoe UI,Arial;padding:40px;max-width:800px;margin:0 auto;">
-        <div style="text-align:center;border-bottom:3px solid #22c55e;padding-bottom:20px;margin-bottom:30px;">
-          <h1 style="color:#16a34a;margin:0;">🌍 QUADRO RW - MONITORAGGIO</h1>
-          <p style="color:#666;margin-top:8px;">Anno ${year} • ${new Date().toLocaleDateString('it-IT')}</p>
-        </div>
-        ${accountsHTML}
-        <div style="background:#fef9c3;border:2px solid #eab308;padding:20px;border-radius:12px;text-align:center;margin-top:20px;">
-          <p style="color:#666;margin:0;">TOTALE IVAFE ${year}</p>
-          <p style="font-size:32px;font-weight:bold;color:#ca8a04;margin:8px 0;">€${data.totals.ivafe.toFixed(2)}</p>
-        </div>
-        <p style="margin-top:30px;font-size:12px;color:#888;text-align:center;">⚠️ Documento indicativo - Consultare un commercialista</p>
-      </div>`;
+      // Box totale IVAFE
+      doc.setFillColor(254, 249, 195);
+      doc.setDrawColor(234, 179, 8);
+      doc.roundedRect(15, y, 180, 25, 3, 3, 'FD');
       
-      const container = document.createElement('div');
-      container.style.position = 'absolute';
-      container.style.left = '-9999px';
-      container.innerHTML = html;
-      document.body.appendChild(container);
+      doc.setFontSize(12);
+      doc.setTextColor(100, 100, 100);
+      doc.text(`TOTALE IVAFE ${year}`, 105, y + 10, { align: 'center' });
       
-      setTimeout(() => {
-        html2pdf().set({
-          margin: 10,
-          filename: `Quadro_RW_${year}.pdf`,
-          image: { type: 'jpeg', quality: 0.98 },
-          html2canvas: { scale: 2, useCORS: true, logging: false },
-          jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
-        }).from(container).save().then(() => {
-          document.body.removeChild(container);
-        });
-      }, 100);
+      doc.setFontSize(18);
+      doc.setTextColor(202, 138, 4);
+      doc.text(`€${data.totals.ivafe.toFixed(2)}`, 105, y + 20, { align: 'center' });
+      
+      // Istruzioni
+      y += 35;
+      doc.setFontSize(10);
+      doc.setTextColor(100, 100, 100);
+      doc.text('Istruzioni Quadro RW:', 15, y);
+      doc.setFontSize(9);
+      doc.text('• Codice investimento: 14 (Altri strumenti finanziari)', 15, y + 8);
+      doc.text('• IVAFE: 0.2% sul valore medio annuo proporzionato ai giorni', 15, y + 15);
+      doc.text('• Obbligo monitoraggio per attività finanziarie estere > €15.000', 15, y + 22);
+      
+      // Footer
+      doc.setFontSize(8);
+      doc.setTextColor(150, 150, 150);
+      doc.text('Documento indicativo - Consultare un commercialista per la dichiarazione ufficiale', 105, 280, { align: 'center' });
+      
+      doc.save(`Quadro_RW_${year}.pdf`);
     }
     
     function exportMT5CSV() {
