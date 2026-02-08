@@ -451,7 +451,7 @@
           <div class="form-row">
             <div class="form-group">
               <label>Data</label>
-              <input type="date" id="saleDate">
+              <input type="date" id="saleDate" onchange="fetchExchangeRate()">
             </div>
             <div class="form-group">
               <label>Prodotto</label>
@@ -1045,15 +1045,22 @@
     }
     
     async function fetchExchangeRate() {
+      const dateField = $('saleDate');
+      const rateField = $('saleExchangeRate');
+      
+      if (!dateField.value) return;
+      
+      rateField.value = '...';
+      
       try {
-        const date = $('saleDate').value || new Date().toISOString().split('T')[0];
+        const date = dateField.value;
         const res = await fetch(`https://api.frankfurter.app/${date}?from=USD&to=EUR`);
         const data = await res.json();
         const rate = 1 / data.rates.EUR;
-        $('saleExchangeRate').value = rate.toFixed(4);
+        rateField.value = rate.toFixed(4);
         updateSalePreview();
       } catch {
-        $('saleExchangeRate').value = '1.0850';
+        rateField.value = '1.0850';
         updateSalePreview();
       }
     }
