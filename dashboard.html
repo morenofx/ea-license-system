@@ -2954,15 +2954,108 @@
       let delay = 0;
       
       years.forEach(year => {
-        setTimeout(() => genMT5RT(parseInt(year)), delay);
-        delay += 800;
-        setTimeout(() => genMT5RW(parseInt(year)), delay);
-        delay += 800;
+        setTimeout(() => downloadMT5RT(parseInt(year)), delay);
+        delay += 1000;
+        setTimeout(() => downloadMT5RW(parseInt(year)), delay);
+        delay += 1000;
       });
       
       setTimeout(() => {
         showStatus(`✅ Generati ${years.length * 2} PDF (RT + RW) per: ${years.join(', ')}`);
       }, delay);
+    }
+    
+    // Funzioni download diretto (senza anteprima)
+    function downloadMT5RT(year) {
+      const data = mt5YearlyData[year];
+      if (!data) return;
+      
+      const t = data.totals;
+      const imposta = t.netProfit > 0 ? t.netProfit * 0.26 : 0;
+      
+      let accountsHTML = '';
+      Object.values(data.accounts).forEach(acc => {
+        const impAcc = acc.netProfitEUR > 0 ? acc.netProfitEUR * 0.26 : 0;
+        accountsHTML += `<tr><td>${acc.accountNumber}</td><td>${acc.company}</td><td>${acc.currency}</td><td style="text-align:right;">€${acc.grossProfitEUR.toFixed(2)}</td><td style="text-align:right;">€${Math.abs(acc.grossLossEUR).toFixed(2)}</td><td style="text-align:right;font-weight:bold;">€${acc.netProfitEUR.toFixed(2)}</td><td style="text-align:right;">€${impAcc.toFixed(2)}</td></tr>`;
+      });
+      
+      const html = `<div style="font-family:Segoe UI,Arial;padding:40px;max-width:800px;margin:0 auto;">
+        <div style="text-align:center;border-bottom:3px solid #3b82f6;padding-bottom:20px;margin-bottom:30px;">
+          <h1 style="color:#1e40af;margin:0;">📊 QUADRO RT - PLUSVALENZE</h1>
+          <p style="color:#666;margin-top:8px;">Anno ${year} • ${new Date().toLocaleDateString('it-IT')}</p>
+        </div>
+        <div style="background:#f8fafc;padding:20px;border-radius:12px;margin-bottom:20px;">
+          <p><strong>Totale Corrispettivi (RT21):</strong> €${(t.grossProfit + Math.abs(t.grossLoss)).toFixed(2)}</p>
+          <p><strong>Totale Costi (RT22):</strong> €${Math.abs(t.grossLoss).toFixed(2)}</p>
+          <p><strong>Plusvalenza Netta (RT23):</strong> €${t.netProfit.toFixed(2)}</p>
+        </div>
+        <div style="background:#fee2e2;border:2px solid #ef4444;padding:20px;border-radius:12px;text-align:center;margin-bottom:20px;">
+          <p style="color:#666;margin:0;">IMPOSTA SOSTITUTIVA 26% (RT26)</p>
+          <p style="font-size:32px;font-weight:bold;color:#dc2626;margin:8px 0;">€${imposta.toFixed(2)}</p>
+        </div>
+        <table style="width:100%;border-collapse:collapse;font-size:13px;">
+          <thead><tr style="background:#e2e8f0;"><th style="padding:10px;text-align:left;">Account</th><th>Broker</th><th>Valuta</th><th>Profitti</th><th>Perdite</th><th>Netto</th><th>Imposta</th></tr></thead>
+          <tbody>${accountsHTML}</tbody>
+        </table>
+        <p style="margin-top:30px;font-size:12px;color:#888;text-align:center;">⚠️ Documento indicativo - Consultare un commercialista</p>
+      </div>`;
+      
+      const container = document.createElement('div');
+      container.innerHTML = html;
+      document.body.appendChild(container);
+      
+      html2pdf().set({
+        margin: 10,
+        filename: `Quadro_RT_${year}.pdf`,
+        image: { type: 'jpeg', quality: 0.98 },
+        html2canvas: { scale: 2 },
+        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+      }).from(container).save().then(() => {
+        document.body.removeChild(container);
+      });
+    }
+    
+    function downloadMT5RW(year) {
+      const data = mt5YearlyData[year];
+      if (!data) return;
+      
+      let accountsHTML = '';
+      Object.values(data.accounts).forEach((acc, idx) => {
+        accountsHTML += `<div style="background:#f0fdf4;border:2px solid #22c55e;border-radius:12px;padding:20px;margin-bottom:16px;">
+          <h3 style="color:#16a34a;margin:0 0 12px 0;">Account #${idx + 1}: ${acc.accountNumber}</h3>
+          <p><strong>Broker:</strong> ${acc.company} | <strong>Paese:</strong> ${acc.countryInfo.name} (${acc.countryInfo.code})</p>
+          <p><strong>Valuta:</strong> ${acc.currency} | <strong>Giorni:</strong> ${acc.giorni}</p>
+          <p><strong>Valore Iniziale:</strong> €${acc.valoreInizialeEUR.toFixed(2)} | <strong>Valore Finale:</strong> €${acc.valoreFinaleEUR.toFixed(2)}</p>
+          <p style="text-align:right;font-size:18px;font-weight:bold;color:#ca8a04;margin-top:12px;">IVAFE: €${acc.ivafe.toFixed(2)}</p>
+        </div>`;
+      });
+      
+      const html = `<div style="font-family:Segoe UI,Arial;padding:40px;max-width:800px;margin:0 auto;">
+        <div style="text-align:center;border-bottom:3px solid #22c55e;padding-bottom:20px;margin-bottom:30px;">
+          <h1 style="color:#16a34a;margin:0;">🌍 QUADRO RW - MONITORAGGIO</h1>
+          <p style="color:#666;margin-top:8px;">Anno ${year} • ${new Date().toLocaleDateString('it-IT')}</p>
+        </div>
+        ${accountsHTML}
+        <div style="background:#fef9c3;border:2px solid #eab308;padding:20px;border-radius:12px;text-align:center;margin-top:20px;">
+          <p style="color:#666;margin:0;">TOTALE IVAFE ${year}</p>
+          <p style="font-size:32px;font-weight:bold;color:#ca8a04;margin:8px 0;">€${data.totals.ivafe.toFixed(2)}</p>
+        </div>
+        <p style="margin-top:30px;font-size:12px;color:#888;text-align:center;">⚠️ Documento indicativo - Consultare un commercialista</p>
+      </div>`;
+      
+      const container = document.createElement('div');
+      container.innerHTML = html;
+      document.body.appendChild(container);
+      
+      html2pdf().set({
+        margin: 10,
+        filename: `Quadro_RW_${year}.pdf`,
+        image: { type: 'jpeg', quality: 0.98 },
+        html2canvas: { scale: 2 },
+        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+      }).from(container).save().then(() => {
+        document.body.removeChild(container);
+      });
     }
     
     function exportMT5CSV() {
