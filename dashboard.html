@@ -776,6 +776,11 @@
             <li><strong>INPS:</strong> Obbligatoria solo se reddito > €5.000</li>
           </ul>
         </div>
+        
+        <!-- Pulsante Report -->
+        <button class="btn btn-primary" onclick="generaReportFiscale()" style="margin-top:20px;width:100%;">
+          📄 Genera Report Fiscale per Commercialista
+        </button>
       </div>
 
       <!-- ==================== EXPORT TAB ==================== -->
@@ -1423,6 +1428,185 @@
           <div class="tax-total-value">€${totaleImposte.toFixed(2)}</div>
         </div>
       `;
+    }
+    
+    // ==================== REPORT FISCALE ====================
+    function generaReportFiscale() {
+      const year = $('taxYear').value;
+      const totLordoEUR = sales.reduce((sum, s) => sum + s.amount_eur_gross, 0);
+      const totNettoEUR = sales.reduce((sum, s) => sum + s.amount_eur_net, 0);
+      const commissioneMQL5 = totLordoEUR - totNettoEUR;
+      const altriRedditiVal = parseFloat($('altriRedditi').value) || 0;
+      
+      const redditoImponibileMQL5 = totNettoEUR;
+      const redditoTotale = redditoImponibileMQL5 + altriRedditiVal;
+      
+      // IRPEF progressiva
+      let irpefTotale = 0;
+      let remaining = redditoTotale;
+      if (remaining > 0) { const first = Math.min(remaining, 28000); irpefTotale += first * 0.23; remaining -= first; }
+      if (remaining > 0) { const second = Math.min(remaining, 22000); irpefTotale += second * 0.35; remaining -= second; }
+      if (remaining > 0) { irpefTotale += remaining * 0.43; }
+      
+      const proporzione = redditoTotale > 0 ? redditoImponibileMQL5 / redditoTotale : 0;
+      const irpefMQL5 = irpefTotale * proporzione;
+      
+      const sogliaINPS = 5000;
+      const inps = redditoImponibileMQL5 > sogliaINPS ? redditoImponibileMQL5 * 0.2607 : 0;
+      const addizionali = irpefMQL5 * 0.087;
+      const totaleImposte = irpefMQL5 + inps + addizionali;
+      
+      // Dettaglio vendite
+      let venditeRows = '';
+      const salesSorted = [...sales].sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+      salesSorted.forEach(s => {
+        const data = new Date(s.created_at).toLocaleDateString('it-IT');
+        venditeRows += `<tr>
+          <td>${data}</td>
+          <td>${s.product_name || 'EA'}</td>
+          <td class="number">$${s.amount_usd.toFixed(2)}</td>
+          <td class="number">${s.exchange_rate ? s.exchange_rate.toFixed(4) : '-'}</td>
+          <td class="number">€${s.amount_eur_gross.toFixed(2)}</td>
+          <td class="number">€${s.amount_eur_net.toFixed(2)}</td>
+        </tr>`;
+      });
+      
+      const inpsRow = inps > 0 
+        ? `<div class="row"><span class="label">INPS Gestione Separata (26.07%)</span><span class="value">€${inps.toFixed(2)}</span></div>` 
+        : `<div class="row"><span class="label">INPS Gestione Separata</span><span class="value" style="color: #4caf50;">€0,00 (sotto soglia 5.000€)</span></div>`;
+      
+      const inpsNote = redditoImponibileMQL5 > sogliaINPS 
+        ? `<li style="color: #d32f2f;"><strong>⚠️ INPS:</strong> Superata soglia 5.000€ - Obbligo iscrizione Gestione Separata</li>` 
+        : `<li><strong>INPS:</strong> Non dovuta (reddito sotto 5.000€)</li>`;
+      
+      const today = new Date().toLocaleDateString('it-IT');
+      
+      const reportHTML = `<!DOCTYPE html><html lang="it"><head><meta charset="UTF-8"><title>Report Fiscale MQL5 - Anno ${year}</title>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"><\/script>
+        <style>
+          * { box-sizing: border-box; margin: 0; padding: 0; }
+          body { font-family: Segoe UI, Arial, sans-serif; padding: 40px; max-width: 800px; margin: 0 auto; color: #1a1a1a; line-height: 1.6; }
+          .header { text-align: center; margin-bottom: 40px; padding-bottom: 20px; border-bottom: 3px solid #f7931a; }
+          .header h1 { font-size: 28px; color: #1a1a1a; margin-bottom: 8px; }
+          .header .subtitle { color: #666; font-size: 14px; }
+          .section { margin-bottom: 32px; background: #f9f9f9; border-radius: 8px; padding: 24px; }
+          .section h2 { font-size: 16px; color: #f7931a; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 16px; padding-bottom: 8px; border-bottom: 1px solid #ddd; }
+          .row { display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid #eee; }
+          .row:last-child { border-bottom: none; }
+          .row .label { color: #555; }
+          .row .value { font-weight: 600; font-family: Consolas, monospace; }
+          .highlight { background: #fff3e0; border: 2px solid #f7931a; padding: 20px; border-radius: 8px; margin: 24px 0; }
+          .highlight .label { font-size: 14px; color: #666; }
+          .highlight .value { font-size: 32px; color: #f7931a; font-weight: 700; }
+          table { width: 100%; border-collapse: collapse; margin-top: 16px; font-size: 13px; }
+          th, td { padding: 12px 8px; text-align: left; border-bottom: 1px solid #ddd; }
+          th { background: #f0f0f0; font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; }
+          td.number { text-align: right; font-family: Consolas, monospace; }
+          .info-box { background: #e3f2fd; border-left: 4px solid #2196f3; padding: 16px; margin-top: 24px; font-size: 13px; }
+          .info-box h4 { color: #1976d2; margin-bottom: 8px; }
+          .info-box ul { margin-left: 20px; }
+          .footer { margin-top: 40px; padding-top: 20px; border-top: 1px solid #ddd; text-align: center; font-size: 12px; color: #888; }
+          .quadro-box { background: #fff; border: 2px solid #4caf50; border-radius: 8px; padding: 20px; margin: 16px 0; }
+          .quadro-box h3 { color: #4caf50; margin-bottom: 12px; font-size: 18px; }
+          .btn-pdf { display: block; margin: 20px auto; padding: 14px 32px; background: linear-gradient(135deg, #f7931a 0%, #e8850a 100%); color: white; border: none; border-radius: 8px; font-size: 16px; font-weight: 600; cursor: pointer; }
+          .btn-pdf:hover { opacity: 0.9; }
+          @media print { body { padding: 20px; } .section { break-inside: avoid; } .btn-pdf { display: none; } }
+        </style></head><body>
+        <button class="btn-pdf" onclick="scaricaPDF()">📥 Scarica PDF</button>
+        <div id="report-content">
+          <div class="header">
+            <h1>📊 Report Fiscale MQL5</h1>
+            <div class="subtitle">Anno d'imposta ${year} • Generato il ${today}</div>
+          </div>
+          
+          <div class="section">
+            <h2>📋 Riepilogo Vendite</h2>
+            <div class="row"><span class="label">Numero vendite</span><span class="value">${sales.length}</span></div>
+            <div class="row"><span class="label">Totale lordo EUR</span><span class="value">€${totLordoEUR.toFixed(2)}</span></div>
+            <div class="row"><span class="label">Commissione piattaforma (20%)</span><span class="value">- €${commissioneMQL5.toFixed(2)}</span></div>
+            <div class="row"><span class="label">Totale netto EUR (incassato)</span><span class="value" style="color: #4caf50;">€${totNettoEUR.toFixed(2)}</span></div>
+          </div>
+          
+          <div class="quadro-box">
+            <h3>📝 Quadro RL - Redditi Diversi</h3>
+            <p style="margin-bottom: 12px; color: #555;">Importo da dichiarare nel <strong>Quadro RL, Sezione II-A</strong> del Modello Redditi PF:</p>
+            <div class="highlight" style="background: #e8f5e9; border-color: #4caf50;">
+              <div class="label">REDDITO LORDO DA DICHIARARE</div>
+              <div class="value" style="color: #2e7d32;">€${totLordoEUR.toFixed(2)}</div>
+            </div>
+            <p style="font-size: 13px; color: #666; margin-top: 12px;">⚠️ Si dichiara il <strong>lordo</strong> (prima della commissione). La commissione del 20% è deducibile come costo di produzione del reddito.</p>
+          </div>
+          
+          <div class="section">
+            <h2>💰 Calcolo Imposte Stimate</h2>
+            <div class="row"><span class="label">Reddito lordo MQL5</span><span class="value">€${totLordoEUR.toFixed(2)}</span></div>
+            <div class="row"><span class="label">Commissione deducibile (20%)</span><span class="value" style="color: #4caf50;">- €${commissioneMQL5.toFixed(2)}</span></div>
+            <div class="row"><span class="label">Reddito imponibile MQL5</span><span class="value">€${redditoImponibileMQL5.toFixed(2)}</span></div>
+            <div class="row"><span class="label">Altri redditi dichiarati</span><span class="value">€${altriRedditiVal.toFixed(2)}</span></div>
+            <div class="row"><span class="label">Reddito complessivo</span><span class="value">€${redditoTotale.toFixed(2)}</span></div>
+            <div class="row"><span class="label">IRPEF su reddito MQL5 (aliquota marginale)</span><span class="value">€${irpefMQL5.toFixed(2)}</span></div>
+            ${inpsRow}
+            <div class="row"><span class="label">Addizionali regionali/comunali (stima)</span><span class="value">€${addizionali.toFixed(2)}</span></div>
+            <div class="highlight">
+              <div class="label">TOTALE IMPOSTE STIMATE</div>
+              <div class="value">€${totaleImposte.toFixed(2)}</div>
+            </div>
+          </div>
+          
+          <div class="section">
+            <h2>📑 Dettaglio Vendite</h2>
+            <table>
+              <thead>
+                <tr><th>Data</th><th>Prodotto</th><th>Lordo USD</th><th>Cambio</th><th>Lordo EUR</th><th>Netto EUR</th></tr>
+              </thead>
+              <tbody>
+                ${venditeRows}
+                <tr style="font-weight: bold; background: #f5f5f5;">
+                  <td colspan="2">TOTALE</td>
+                  <td class="number">$${sales.reduce((s,x) => s + x.amount_usd, 0).toFixed(2)}</td>
+                  <td></td>
+                  <td class="number">€${totLordoEUR.toFixed(2)}</td>
+                  <td class="number">€${totNettoEUR.toFixed(2)}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          
+          <div class="info-box">
+            <h4>ℹ️ Istruzioni per la Dichiarazione</h4>
+            <ul>
+              <li><strong>Modello:</strong> Redditi PF oppure 730 (se hai sostituto d'imposta)</li>
+              <li><strong>Quadro:</strong> RL - Sezione II-A "Altri redditi di lavoro autonomo"</li>
+              <li><strong>Rigo:</strong> RL15 o RL16</li>
+              <li><strong>Importo:</strong> Reddito LORDO (€${totLordoEUR.toFixed(2)})</li>
+              <li><strong>Costi deducibili:</strong> Commissione 20% (€${commissioneMQL5.toFixed(2)})</li>
+              ${inpsNote}
+            </ul>
+          </div>
+          
+          <div class="footer">
+            <p>Report generato automaticamente da EA Business Dashboard</p>
+            <p>⚠️ Documento indicativo - Consultare un commercialista per la dichiarazione ufficiale</p>
+          </div>
+        </div>
+        <script>
+          function scaricaPDF() {
+            var element = document.getElementById("report-content");
+            var opt = {
+              margin: 10,
+              filename: "Report-Fiscale-MQL5-${year}.pdf",
+              image: { type: "jpeg", quality: 0.98 },
+              html2canvas: { scale: 2 },
+              jsPDF: { unit: "mm", format: "a4", orientation: "portrait" }
+            };
+            html2pdf().set(opt).from(element).save();
+          }
+        <\/script>
+        </body></html>`;
+      
+      const printWindow = window.open('', '_blank');
+      printWindow.document.write(reportHTML);
+      printWindow.document.close();
     }
     
     // ==================== EXPORT ====================
