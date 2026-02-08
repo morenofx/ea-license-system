@@ -258,6 +258,7 @@
     
     .type-paid { background: rgba(255, 215, 0, 0.15); color: #ffd700; }
     .type-free { background: rgba(34, 197, 94, 0.15); color: #22c55e; }
+    .type-trial { background: rgba(245, 158, 11, 0.15); color: #f59e0b; }
     
     .product-ea { background: rgba(168, 85, 247, 0.15); color: #a855f7; }
     .product-signal { background: rgba(236, 72, 153, 0.15); color: #ec4899; }
@@ -544,7 +545,7 @@
         <div class="stats-grid">
           <div class="stat-card">
             <div class="stat-number orange" id="statTotaleLicenses">0</div>
-            <div class="stat-label">Licenze Attive</div>
+            <div class="stat-label">Licenze Totali</div>
           </div>
           <div class="stat-card">
             <div class="stat-number gold" id="statXAU">0</div>
@@ -561,6 +562,10 @@
           <div class="stat-card">
             <div class="stat-number" style="color:#22c55e;" id="statFreeLic">0</div>
             <div class="stat-label">🎁 Free</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-number" style="color:#f59e0b;" id="statTrial">0</div>
+            <div class="stat-label">⏱️ Trial</div>
           </div>
         </div>
         
@@ -589,10 +594,15 @@
             </div>
             <div class="form-group">
               <label>Tipo Licenza</label>
-              <select id="licType">
-                <option value="paid">💰 Paid</option>
-                <option value="free">🎁 Free</option>
+              <select id="licType" onchange="toggleTrialDays()">
+                <option value="paid">💰 Paid (Lifetime)</option>
+                <option value="free">🎁 Free (Lifetime)</option>
+                <option value="trial">⏱️ Trial</option>
               </select>
+            </div>
+            <div class="form-group" id="trialDaysGroup" style="display:none;">
+              <label>Giorni Trial</label>
+              <input type="number" id="licTrialDays" value="7" min="1" max="90">
             </div>
           </div>
           <div class="btn-group">
@@ -612,7 +622,7 @@
                   <th>Cliente</th>
                   <th>Prodotto</th>
                   <th>Tipo</th>
-                  <th>Data Creazione</th>
+                  <th>Scadenza</th>
                   <th>Azioni</th>
                 </tr>
               </thead>
@@ -1062,14 +1072,44 @@
       
       tbody.innerHTML = licenses.map(l => {
         const licType = l.license_type || 'paid';
-        const typeLabel = licType === 'free' ? '🎁 Free' : '💰 Paid';
+        let typeLabel, typeClass;
+        
+        if (licType === 'trial') {
+          typeLabel = '⏱️ Trial';
+          typeClass = 'type-trial';
+        } else if (licType === 'free') {
+          typeLabel = '🎁 Free';
+          typeClass = 'type-free';
+        } else {
+          typeLabel = '💰 Paid';
+          typeClass = 'type-paid';
+        }
+        
+        // Calcola scadenza
+        let expiresLabel = 'Lifetime';
+        if (licType === 'trial' && l.expires_at) {
+          const expires = new Date(l.expires_at);
+          const now = new Date();
+          const daysLeft = Math.ceil((expires - now) / (1000 * 60 * 60 * 24));
+          
+          if (daysLeft < 0) {
+            expiresLabel = '<span style="color:#ef4444;">⛔ Scaduta</span>';
+          } else if (daysLeft === 0) {
+            expiresLabel = '<span style="color:#f59e0b;">⚠️ Scade oggi</span>';
+          } else if (daysLeft <= 3) {
+            expiresLabel = `<span style="color:#f59e0b;">${daysLeft}g rimasti</span>`;
+          } else {
+            expiresLabel = `${daysLeft}g (${formatDate(l.expires_at)})`;
+          }
+        }
+        
         return `
         <tr>
           <td class="mono">${l.account_number}</td>
           <td>${l.client_name}</td>
           <td>${l.ea_product.replace('_', ' ')}</td>
-          <td><span class="source-badge type-${licType}">${typeLabel}</span></td>
-          <td>${formatDate(l.created_at)}</td>
+          <td><span class="source-badge ${typeClass}">${typeLabel}</span></td>
+          <td>${expiresLabel}</td>
           <td><button class="btn btn-danger" onclick="deleteLicense(${l.id})">🗑️</button></td>
         </tr>
       `}).join('');
@@ -1082,26 +1122,45 @@
       const btc = licenses.filter(l => l.ea_product === 'BTC_AutoTrader');
       const paid = licenses.filter(l => (l.license_type || 'paid') === 'paid');
       const free = licenses.filter(l => l.license_type === 'free');
+      const trial = licenses.filter(l => l.license_type === 'trial');
       
       $('statTotaleLicenses').textContent = licenses.length;
       $('statXAU').textContent = xau.length;
       $('statBTC').textContent = btc.length;
       $('statPaid').textContent = paid.length;
       $('statFreeLic').textContent = free.length;
+      $('statTrial').textContent = trial.length;
     }
     
     function toggleLicenseForm() {
       const form = $('licenseForm');
       form.style.display = form.style.display === 'none' ? 'block' : 'none';
+      if (form.style.display === 'block') {
+        $('licAccountNumber').value = '';
+        $('licClientName').value = '';
+        $('licType').value = 'paid';
+        $('licTrialDays').value = '7';
+        toggleTrialDays();
+      }
+    }
+    
+    function toggleTrialDays() {
+      const isTrial = $('licType').value === 'trial';
+      $('trialDaysGroup').style.display = isTrial ? 'block' : 'none';
     }
     
     async function saveLicense() {
+      const licenseType = $('licType').value;
       const licenseData = {
         account_number: $('licAccountNumber').value.trim(),
         client_name: $('licClientName').value.trim(),
         ea_product: $('licProduct').value,
-        license_type: $('licType').value
+        license_type: licenseType
       };
+      
+      if (licenseType === 'trial') {
+        licenseData.trial_days = parseInt($('licTrialDays').value) || 7;
+      }
       
       if (!licenseData.account_number || !licenseData.client_name) {
         showStatus('Compila tutti i campi', true);

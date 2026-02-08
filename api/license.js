@@ -34,9 +34,24 @@ export default async function handler(req, res) {
         return res.status(200).json({ valid: false });
       }
 
+      // Check if trial license is expired
+      if (data.license_type === 'trial' && data.expires_at) {
+        const expiresAt = new Date(data.expires_at);
+        const now = new Date();
+        
+        if (now > expiresAt) {
+          return res.status(200).json({ 
+            valid: false, 
+            expired: true,
+            message: 'Trial license expired'
+          });
+        }
+      }
+
       return res.status(200).json({ 
         valid: true, 
-        name: data.client_name 
+        name: data.client_name,
+        license_type: data.license_type || 'paid'
       });
 
     } catch (err) {

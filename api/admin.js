@@ -41,7 +41,7 @@ export default async function handler(req, res) {
 
       // POST - Add new license
       if (req.method === 'POST') {
-        const { account_number, client_name, ea_product, license_type } = req.body;
+        const { account_number, client_name, ea_product, license_type, trial_days } = req.body;
 
         if (!account_number || !client_name || !ea_product) {
           return res.status(400).json({ error: 'Missing required fields' });
@@ -59,9 +59,24 @@ export default async function handler(req, res) {
           return res.status(400).json({ error: 'License already exists' });
         }
 
+        // Prepare license data
+        const licenseData = { 
+          account_number, 
+          client_name, 
+          ea_product, 
+          license_type: license_type || 'paid' 
+        };
+        
+        // Calculate expires_at for trial licenses
+        if (license_type === 'trial' && trial_days) {
+          const expiresAt = new Date();
+          expiresAt.setDate(expiresAt.getDate() + parseInt(trial_days));
+          licenseData.expires_at = expiresAt.toISOString();
+        }
+
         const { data, error } = await supabase
           .from('licenses')
-          .insert([{ account_number, client_name, ea_product, license_type: license_type || 'paid' }])
+          .insert([licenseData])
           .select()
           .single();
 
