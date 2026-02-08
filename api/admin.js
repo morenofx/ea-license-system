@@ -22,69 +22,236 @@ export default async function handler(req, res) {
     return res.status(401).json({ error: 'Unauthorized' });
   }
 
+  const { type } = req.query; // 'licenses' or 'sales'
+
   try {
-    // GET - List all licenses
-    if (req.method === 'GET') {
-      const { data, error } = await supabase
-        .from('licenses')
-        .select('*')
-        .order('created_at', { ascending: false });
+    // ==================== LICENSES ====================
+    if (type === 'licenses' || !type) {
+      
+      // GET - List all licenses
+      if (req.method === 'GET') {
+        const { data, error } = await supabase
+          .from('licenses')
+          .select('*')
+          .order('created_at', { ascending: false });
 
-      if (error) throw error;
-      return res.status(200).json({ licenses: data });
+        if (error) throw error;
+        return res.status(200).json({ licenses: data });
+      }
+
+      // POST - Add new license
+      if (req.method === 'POST') {
+        const { account_number, client_name, ea_product } = req.body;
+
+        if (!account_number || !client_name || !ea_product) {
+          return res.status(400).json({ error: 'Missing required fields' });
+        }
+
+        // Check if already exists
+        const { data: existing } = await supabase
+          .from('licenses')
+          .select('*')
+          .eq('account_number', account_number)
+          .eq('ea_product', ea_product)
+          .single();
+
+        if (existing) {
+          return res.status(400).json({ error: 'License already exists' });
+        }
+
+        const { data, error } = await supabase
+          .from('licenses')
+          .insert([{ account_number, client_name, ea_product }])
+          .select()
+          .single();
+
+        if (error) throw error;
+        return res.status(201).json({ success: true, license: data });
+      }
+
+      // DELETE - Remove license
+      if (req.method === 'DELETE') {
+        const { id } = req.body;
+
+        if (!id) {
+          return res.status(400).json({ error: 'Missing license ID' });
+        }
+
+        const { error } = await supabase
+          .from('licenses')
+          .delete()
+          .eq('id', id);
+
+        if (error) throw error;
+        return res.status(200).json({ success: true });
+      }
     }
 
-    // POST - Add new license
-    if (req.method === 'POST') {
-      const { account_number, client_name, ea_product } = req.body;
+    // ==================== SALES ====================
+    if (type === 'sales') {
+      
+      // GET - List all sales (with optional year filter)
+      if (req.method === 'GET') {
+        const { year } = req.query;
+        
+        let query = supabase
+          .from('sales')
+          .select('*')
+          .order('sale_date', { ascending: false });
+        
+        if (year) {
+          query = query
+            .gte('sale_date', `${year}-01-01`)
+            .lte('sale_date', `${year}-12-31`);
+        }
 
-      if (!account_number || !client_name || !ea_product) {
-        return res.status(400).json({ error: 'Missing required fields' });
+        const { data, error } = await query;
+
+        if (error) throw error;
+        return res.status(200).json({ sales: data });
       }
 
-      // Check if account already exists for this product
-      const { data: existing } = await supabase
-        .from('licenses')
-        .select('*')
-        .eq('account_number', account_number)
-        .eq('ea_product', ea_product)
-        .single();
+      // POST - Add new sale
+      if (req.method === 'POST') {
+        const { 
+          sale_date, 
+          ea_product, 
+          source, 
+          amount_usd, 
+          exchange_rate,
+          client_name,
+          account_number,
+          notes,
+          create_license  // boolean: auto-create license for private/free sales
+        } = req.body;
 
-      if (existing) {
-        return res.status(400).json({ error: 'License already exists for this account' });
+        // Free requires only date, product, source + client info
+        const isFree = (source === 'free');
+        
+        if (!sale_date || !ea_product || !source) {
+          return res.status(400).json({ error: 'Missing required fields' });
+        }
+        
+        if (!isFree && (!amount_usd || !exchange_rate)) {
+          return res.status(400).json({ error: 'Missing amount or exchange rate' });
+        }
+        
+        if (isFree && (!client_name || !account_number)) {
+          return res.status(400).json({ error: 'Free gifts require client name and account' });
+        }
+
+        // Calculate EUR amounts (0 for free)
+        const amountUSD = isFree ? 0 : parseFloat(amount_usd);
+        const rate = parseFloat(exchange_rate) || 1;
+        const amount_eur_gross = amountUSD / rate;
+        const amount_eur_net = amount_eur_gross * 0.80; // 20% MQL5 commission
+
+        const saleData = {
+          sale_date,
+          ea_product,
+          source,
+          amount_usd: amountUSD,
+          exchange_rate: rate,
+          amount_eur_gross: Math.round(amount_eur_gross * 100) / 100,
+          amount_eur_net: Math.round(amount_eur_net * 100) / 100,
+          client_name: client_name || null,
+          account_number: account_number || null,
+          notes: notes || null
+        };
+
+        const { data, error } = await supabase
+          .from('sales')
+          .insert([saleData])
+          .select()
+          .single();
+
+        if (error) throw error;
+
+        // Auto-create license for private/free sales
+        let licenseCreated = false;
+        const shouldCreateLicense = (source === 'private' || source === 'free') && 
+                                     (create_license || source === 'free') && // Free always creates license
+                                     account_number && client_name;
+          if (shouldCreateLicense) {
+          // Check if license already exists
+          const { data: existingLic } = await supabase
+            .from('licenses')
+            .select('*')
+            .eq('account_number', account_number)
+            .eq('ea_product', ea_product)
+            .single();
+
+          if (!existingLic) {
+            await supabase
+              .from('licenses')
+              .insert([{ account_number, client_name, ea_product }]);
+            licenseCreated = true;
+          }
+        }
+
+        return res.status(201).json({ 
+          success: true, 
+          sale: data,
+          licenseCreated 
+        });
       }
 
-      const { data, error } = await supabase
-        .from('licenses')
-        .insert([{ account_number, client_name, ea_product }])
-        .select()
-        .single();
+      // DELETE - Remove sale
+      if (req.method === 'DELETE') {
+        const { id } = req.body;
 
-      if (error) throw error;
-      return res.status(201).json({ success: true, license: data });
+        if (!id) {
+          return res.status(400).json({ error: 'Missing sale ID' });
+        }
+
+        const { error } = await supabase
+          .from('sales')
+          .delete()
+          .eq('id', id);
+
+        if (error) throw error;
+        return res.status(200).json({ success: true });
+      }
     }
 
-    // DELETE - Remove license
-    if (req.method === 'DELETE') {
-      const { id } = req.body;
+    // ==================== EXPORT ====================
+    if (type === 'export') {
+      if (req.method === 'GET') {
+        const { year } = req.query;
+        
+        // Get licenses
+        const { data: licenses } = await supabase
+          .from('licenses')
+          .select('*')
+          .order('created_at', { ascending: false });
 
-      if (!id) {
-        return res.status(400).json({ error: 'Missing license ID' });
+        // Get sales
+        let salesQuery = supabase
+          .from('sales')
+          .select('*')
+          .order('sale_date', { ascending: false });
+        
+        if (year) {
+          salesQuery = salesQuery
+            .gte('sale_date', `${year}-01-01`)
+            .lte('sale_date', `${year}-12-31`);
+        }
+
+        const { data: sales } = await salesQuery;
+
+        return res.status(200).json({
+          exportDate: new Date().toISOString(),
+          year: year || 'all',
+          licenses: licenses || [],
+          sales: sales || []
+        });
       }
-
-      const { error } = await supabase
-        .from('licenses')
-        .delete()
-        .eq('id', id);
-
-      if (error) throw error;
-      return res.status(200).json({ success: true });
     }
 
     return res.status(405).json({ error: 'Method not allowed' });
 
   } catch (err) {
     console.error(err);
-    return res.status(500).json({ error: 'Server error' });
+    return res.status(500).json({ error: 'Server error', details: err.message });
   }
 }

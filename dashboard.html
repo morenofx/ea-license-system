@@ -1,0 +1,1392 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>EA Business Dashboard</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🤖</text></svg>">
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    
+    body {
+      min-height: 100vh;
+      background: linear-gradient(145deg, #0c1220 0%, #1a2744 50%, #0f1a2b 100%);
+      font-family: 'IBM Plex Sans', -apple-system, sans-serif;
+      color: #e8e8e8;
+      padding: 24px 16px;
+    }
+    
+    .container { max-width: 1100px; margin: 0 auto; }
+    
+    /* Header */
+    .header { text-align: center; margin-bottom: 32px; }
+    
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: rgba(247, 147, 26, 0.1);
+      border: 1px solid rgba(247, 147, 26, 0.2);
+      border-radius: 100px;
+      padding: 8px 20px;
+      margin-bottom: 16px;
+      font-size: 13px;
+      font-weight: 500;
+      color: #f7931a;
+    }
+    
+    h1 {
+      font-size: clamp(24px, 4vw, 36px);
+      font-weight: 700;
+      background: linear-gradient(135deg, #fff 0%, #a8a8a8 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    
+    .subtitle { font-size: 14px; color: rgba(255,255,255,0.5); margin-top: 8px; }
+    
+    /* Tabs */
+    .tabs {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 24px;
+      border-bottom: 1px solid rgba(255,255,255,0.1);
+      padding-bottom: 16px;
+    }
+    
+    .tab {
+      padding: 12px 24px;
+      background: rgba(255,255,255,0.03);
+      border: 1px solid rgba(255,255,255,0.06);
+      border-radius: 8px;
+      color: rgba(255,255,255,0.6);
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    
+    .tab:hover { background: rgba(255,255,255,0.06); }
+    .tab.active { 
+      background: rgba(247, 147, 26, 0.15); 
+      border-color: rgba(247, 147, 26, 0.3);
+      color: #f7931a; 
+    }
+    
+    /* Cards */
+    .card {
+      background: rgba(255,255,255,0.03);
+      border: 1px solid rgba(255,255,255,0.06);
+      border-radius: 16px;
+      padding: 24px;
+      margin-bottom: 20px;
+    }
+    
+    .card-title {
+      font-size: 14px;
+      font-weight: 600;
+      color: rgba(255,255,255,0.4);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-bottom: 16px;
+    }
+    
+    /* Stats Grid */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+      gap: 12px;
+      margin-bottom: 24px;
+    }
+    
+    .stat-card {
+      background: rgba(255,255,255,0.02);
+      border: 1px solid rgba(255,255,255,0.05);
+      border-radius: 12px;
+      padding: 20px;
+      text-align: center;
+    }
+    
+    .stat-number {
+      font-size: 28px;
+      font-weight: 700;
+      font-family: 'IBM Plex Mono', monospace;
+    }
+    
+    .stat-label {
+      font-size: 12px;
+      color: rgba(255,255,255,0.5);
+      margin-top: 4px;
+    }
+    
+    .orange { color: #f7931a; }
+    .green { color: #22c55e; }
+    .red { color: #ef4444; }
+    .blue { color: #34aadc; }
+    .gold { color: #ffd700; }
+    
+    /* Forms */
+    .form-row {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+    
+    .form-group { display: flex; flex-direction: column; gap: 6px; }
+    
+    label {
+      font-size: 12px;
+      color: rgba(255,255,255,0.5);
+      font-weight: 500;
+    }
+    
+    input, select {
+      background: rgba(255,255,255,0.05);
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 8px;
+      padding: 12px 14px;
+      color: #fff;
+      font-size: 14px;
+      font-family: 'IBM Plex Sans', sans-serif;
+      width: 100%;
+      transition: all 0.2s;
+    }
+    
+    input:focus, select:focus {
+      outline: none;
+      border-color: #f7931a;
+      box-shadow: 0 0 0 3px rgba(247, 147, 26, 0.15);
+    }
+    
+    input::placeholder { color: rgba(255,255,255,0.3); }
+    select option { background: #1a2744; color: #fff; }
+    
+    /* Buttons */
+    .btn {
+      padding: 12px 24px;
+      border-radius: 8px;
+      font-weight: 600;
+      font-size: 14px;
+      cursor: pointer;
+      transition: all 0.2s;
+      border: none;
+      font-family: 'IBM Plex Sans', sans-serif;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+    }
+    
+    .btn-primary {
+      background: linear-gradient(135deg, #f7931a 0%, #e8850a 100%);
+      color: #fff;
+    }
+    .btn-primary:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 4px 20px rgba(247, 147, 26, 0.3);
+    }
+    
+    .btn-secondary {
+      background: rgba(255,255,255,0.05);
+      color: #fff;
+      border: 1px solid rgba(255,255,255,0.1);
+    }
+    .btn-secondary:hover { background: rgba(255,255,255,0.1); }
+    
+    .btn-danger {
+      background: rgba(239, 68, 68, 0.1);
+      color: #ef4444;
+      border: 1px solid rgba(239, 68, 68, 0.2);
+      padding: 8px 16px;
+      font-size: 12px;
+    }
+    .btn-danger:hover { background: rgba(239, 68, 68, 0.2); }
+    
+    .btn-success {
+      background: rgba(34, 197, 94, 0.1);
+      color: #22c55e;
+      border: 1px solid rgba(34, 197, 94, 0.3);
+    }
+    .btn-success:hover { background: rgba(34, 197, 94, 0.2); }
+    
+    .btn-group { display: flex; gap: 8px; flex-wrap: wrap; }
+    
+    /* Tables */
+    .table-container {
+      overflow-x: auto;
+      margin-top: 16px;
+    }
+    
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+    
+    th, td {
+      padding: 12px 10px;
+      text-align: left;
+      border-bottom: 1px solid rgba(255,255,255,0.06);
+    }
+    
+    th {
+      font-size: 11px;
+      font-weight: 600;
+      color: rgba(255,255,255,0.4);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    
+    tr:hover { background: rgba(255,255,255,0.02); }
+    
+    .mono { font-family: 'IBM Plex Mono', monospace; }
+    .text-right { text-align: right; }
+    
+    .source-badge {
+      display: inline-block;
+      padding: 4px 10px;
+      border-radius: 100px;
+      font-size: 11px;
+      font-weight: 600;
+    }
+    
+    .source-market { background: rgba(34, 170, 220, 0.15); color: #34aadc; }
+    .source-private { background: rgba(247, 147, 26, 0.15); color: #f7931a; }
+    .source-free { background: rgba(34, 197, 94, 0.15); color: #22c55e; }
+    
+    /* Login */
+    .login-box {
+      max-width: 400px;
+      margin: 80px auto;
+      text-align: center;
+    }
+    
+    .login-box h2 {
+      color: #f7931a;
+      margin-bottom: 24px;
+    }
+    
+    /* Status messages */
+    .status {
+      padding: 12px 16px;
+      border-radius: 8px;
+      margin-bottom: 16px;
+      font-size: 14px;
+    }
+    
+    .status.success {
+      background: rgba(34, 197, 94, 0.1);
+      border: 1px solid rgba(34, 197, 94, 0.3);
+      color: #22c55e;
+    }
+    
+    .status.error {
+      background: rgba(239, 68, 68, 0.1);
+      border: 1px solid rgba(239, 68, 68, 0.3);
+      color: #ef4444;
+    }
+    
+    /* Panels */
+    .panel { display: none; }
+    .panel.active { display: block; }
+    
+    /* Year selector */
+    .year-selector {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 20px;
+    }
+    
+    .year-selector select {
+      width: auto;
+      min-width: 120px;
+    }
+    
+    /* Checkbox */
+    .checkbox-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 12px 0;
+    }
+    
+    .checkbox-row input[type="checkbox"] {
+      width: 18px;
+      height: 18px;
+      accent-color: #f7931a;
+    }
+    
+    /* Responsive */
+    @media (max-width: 640px) {
+      .tabs { flex-wrap: wrap; }
+      .tab { flex: 1; text-align: center; padding: 10px 16px; }
+      .form-row { grid-template-columns: 1fr; }
+      .btn-group { flex-direction: column; }
+      .btn { width: 100%; justify-content: center; }
+    }
+    
+    /* Tasse section */
+    .tax-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 12px 0;
+      border-bottom: 1px solid rgba(255,255,255,0.06);
+    }
+    .tax-row:last-child { border-bottom: none; }
+    .tax-label { color: rgba(255,255,255,0.7); }
+    .tax-value { font-family: 'IBM Plex Mono', monospace; font-weight: 600; }
+    
+    .tax-total {
+      background: rgba(247, 147, 26, 0.1);
+      border: 1px solid rgba(247, 147, 26, 0.3);
+      border-radius: 12px;
+      padding: 20px;
+      margin-top: 16px;
+      text-align: center;
+    }
+    .tax-total-label { font-size: 14px; color: rgba(255,255,255,0.6); }
+    .tax-total-value { font-size: 32px; font-weight: 700; color: #f7931a; margin-top: 8px; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    
+    <!-- Login Panel -->
+    <div id="loginPanel" class="panel active">
+      <div class="login-box">
+        <div class="badge">🤖 SMART TRADING BOTS</div>
+        <h2>🔐 Admin Login</h2>
+        <div class="card">
+          <div class="form-group">
+            <label>Password</label>
+            <input type="password" id="password" placeholder="Enter admin password" onkeypress="if(event.key==='Enter')login()">
+          </div>
+          <button class="btn btn-primary" style="width:100%; margin-top:16px;" onclick="login()">Login</button>
+          <div id="loginError" style="margin-top:16px; color:#ef4444;"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Main Dashboard -->
+    <div id="mainPanel" class="panel">
+      
+      <!-- Header -->
+      <div class="header">
+        <div class="badge">🤖 SMART TRADING BOTS</div>
+        <h1>EA Business Dashboard</h1>
+        <p class="subtitle">Vendite • Licenze • Tasse</p>
+      </div>
+      
+      <!-- Tabs -->
+      <div class="tabs">
+        <div class="tab active" data-tab="vendite">📊 Vendite</div>
+        <div class="tab" data-tab="licenze">🔑 Licenze</div>
+        <div class="tab" data-tab="tasse">💰 Tasse</div>
+        <div class="tab" data-tab="export">📥 Export</div>
+        <button class="btn btn-secondary" style="margin-left:auto;" onclick="logout()">Logout</button>
+      </div>
+      
+      <div id="statusMsg"></div>
+
+      <!-- ==================== VENDITE TAB ==================== -->
+      <div id="tab-vendite" class="panel active">
+        
+        <!-- Stats -->
+        <div class="stats-grid">
+          <div class="stat-card">
+            <div class="stat-number orange" id="statTotaleSales">0</div>
+            <div class="stat-label">Vendite Totali</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-number blue" id="statMarket">0</div>
+            <div class="stat-label">MQL5 Market</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-number gold" id="statPrivate">0</div>
+            <div class="stat-label">Private</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-number" style="color:#22c55e;" id="statFree">0</div>
+            <div class="stat-label">🎁 Free</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-number green" id="statTotaleEUR">€0</div>
+            <div class="stat-label">Totale Netto EUR</div>
+          </div>
+        </div>
+        
+        <!-- Year Filter -->
+        <div class="year-selector">
+          <label>Anno:</label>
+          <select id="salesYear" onchange="loadSales()">
+            <option value="2024">2024</option>
+            <option value="2025">2025</option>
+            <option value="2026" selected>2026</option>
+            <option value="2027">2027</option>
+          </select>
+          <button class="btn btn-secondary" onclick="toggleSaleForm()">+ Aggiungi Vendita</button>
+        </div>
+        
+        <!-- Add Sale Form -->
+        <div id="saleForm" class="card" style="display:none;">
+          <div class="card-title">➕ Nuova Vendita</div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Data</label>
+              <input type="date" id="saleDate">
+            </div>
+            <div class="form-group">
+              <label>Prodotto</label>
+              <select id="saleProduct">
+                <option value="XAU_AutoTrader">XAU_AutoTrader</option>
+                <option value="BTC_AutoTrader">BTC_AutoTrader</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Fonte</label>
+              <select id="saleSource" onchange="togglePrivateFields()">
+                <option value="market">MQL5 Market</option>
+                <option value="private">Vendita Privata</option>
+                <option value="free">🎁 Free / Regalo</option>
+              </select>
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Importo USD</label>
+              <input type="number" id="saleAmountUSD" placeholder="30.00" step="0.01" oninput="updateSalePreview()">
+            </div>
+            <div class="form-group">
+              <label>Cambio EUR/USD <button class="btn btn-secondary" style="padding:4px 8px;font-size:11px;" onclick="fetchExchangeRate()">🔄</button></label>
+              <input type="number" id="saleExchangeRate" placeholder="1.0850" step="0.0001" oninput="updateSalePreview()">
+            </div>
+            <div class="form-group">
+              <label>Anteprima Netto EUR</label>
+              <input type="text" id="salePreviewEUR" readonly style="background:rgba(34,197,94,0.1);color:#22c55e;">
+            </div>
+          </div>
+          
+          <!-- Private sale fields -->
+          <div id="privateFields" style="display:none;">
+            <div class="form-row">
+              <div class="form-group">
+                <label>Nome Cliente</label>
+                <input type="text" id="saleClientName" placeholder="Mario Rossi">
+              </div>
+              <div class="form-group">
+                <label>Account MT4/MT5</label>
+                <input type="text" id="saleAccountNumber" placeholder="12345678">
+              </div>
+            </div>
+            <div class="checkbox-row">
+              <input type="checkbox" id="saleCreateLicense" checked>
+              <label for="saleCreateLicense">Crea automaticamente licenza per questo account</label>
+            </div>
+          </div>
+          
+          <div class="form-group">
+            <label>Note (opzionale)</label>
+            <input type="text" id="saleNotes" placeholder="Es: Sconto 10%, cliente referral...">
+          </div>
+          
+          <div class="btn-group" style="margin-top:16px;">
+            <button class="btn btn-primary" onclick="saveSale()">💾 Salva Vendita</button>
+            <button class="btn btn-secondary" onclick="toggleSaleForm()">Annulla</button>
+          </div>
+        </div>
+        
+        <!-- Sales Table -->
+        <div class="card">
+          <div class="card-title">📋 Storico Vendite</div>
+          <div class="table-container">
+            <table>
+              <thead>
+                <tr>
+                  <th>Data</th>
+                  <th>Prodotto</th>
+                  <th>Fonte</th>
+                  <th class="text-right">USD</th>
+                  <th class="text-right">Cambio</th>
+                  <th class="text-right">EUR Lordo</th>
+                  <th class="text-right">EUR Netto</th>
+                  <th>Azioni</th>
+                </tr>
+              </thead>
+              <tbody id="salesTable">
+                <tr><td colspan="8" style="text-align:center;color:rgba(255,255,255,0.4);">Caricamento...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- ==================== LICENZE TAB ==================== -->
+      <div id="tab-licenze" class="panel">
+        
+        <!-- Stats -->
+        <div class="stats-grid">
+          <div class="stat-card">
+            <div class="stat-number orange" id="statTotaleLicenses">0</div>
+            <div class="stat-label">Licenze Attive</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-number gold" id="statXAU">0</div>
+            <div class="stat-label">XAU_AutoTrader</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-number blue" id="statBTC">0</div>
+            <div class="stat-label">BTC_AutoTrader</div>
+          </div>
+        </div>
+        
+        <button class="btn btn-secondary" onclick="toggleLicenseForm()" style="margin-bottom:16px;">+ Aggiungi Licenza</button>
+        
+        <!-- Add License Form -->
+        <div id="licenseForm" class="card" style="display:none;">
+          <div class="card-title">➕ Nuova Licenza</div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Account MT4/MT5</label>
+              <input type="text" id="licAccountNumber" placeholder="12345678">
+            </div>
+            <div class="form-group">
+              <label>Nome Cliente</label>
+              <input type="text" id="licClientName" placeholder="Mario Rossi">
+            </div>
+            <div class="form-group">
+              <label>Prodotto EA</label>
+              <select id="licProduct">
+                <option value="XAU_AutoTrader">XAU_AutoTrader</option>
+                <option value="BTC_AutoTrader">BTC_AutoTrader</option>
+              </select>
+            </div>
+          </div>
+          <div class="btn-group">
+            <button class="btn btn-primary" onclick="saveLicense()">💾 Salva Licenza</button>
+            <button class="btn btn-secondary" onclick="toggleLicenseForm()">Annulla</button>
+          </div>
+        </div>
+        
+        <!-- Licenses Table -->
+        <div class="card">
+          <div class="card-title">🔑 Licenze Attive</div>
+          <div class="table-container">
+            <table>
+              <thead>
+                <tr>
+                  <th>Account</th>
+                  <th>Cliente</th>
+                  <th>Prodotto</th>
+                  <th>Data Creazione</th>
+                  <th>Azioni</th>
+                </tr>
+              </thead>
+              <tbody id="licensesTable">
+                <tr><td colspan="5" style="text-align:center;color:rgba(255,255,255,0.4);">Caricamento...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- ==================== TASSE TAB ==================== -->
+      <div id="tab-tasse" class="panel">
+        
+        <div class="year-selector">
+          <label>Anno fiscale:</label>
+          <select id="taxYear" onchange="loadTaxData()">
+            <option value="2024">2024</option>
+            <option value="2025">2025</option>
+            <option value="2026" selected>2026</option>
+          </select>
+        </div>
+        
+        <div class="stats-grid">
+          <div class="stat-card">
+            <div class="stat-number green" id="taxLordoEUR">€0</div>
+            <div class="stat-label">Lordo EUR (da dichiarare)</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-number orange" id="taxNettoEUR">€0</div>
+            <div class="stat-label">Netto EUR (incassato)</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-number red" id="taxTotale">€0</div>
+            <div class="stat-label">Imposte Stimate</div>
+          </div>
+        </div>
+        
+        <!-- Altri redditi -->
+        <div class="card">
+          <div class="card-title">📝 Altri Redditi (per calcolo aliquota)</div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Altri redditi annuali (stipendio, affitti, ecc.)</label>
+              <input type="number" id="altriRedditi" placeholder="0" step="100" oninput="calculateTaxes()">
+            </div>
+          </div>
+        </div>
+        
+        <!-- Tax breakdown -->
+        <div class="card">
+          <div class="card-title">💰 Calcolo Imposte</div>
+          <div id="taxBreakdown">
+            <!-- Filled by JS -->
+          </div>
+        </div>
+        
+        <!-- Info box -->
+        <div class="card" style="background:rgba(52,170,220,0.05);border-color:rgba(52,170,220,0.2);">
+          <div class="card-title" style="color:#34aadc;">ℹ️ Info Dichiarazione</div>
+          <ul style="font-size:13px;color:rgba(255,255,255,0.7);margin-left:20px;line-height:1.8;">
+            <li><strong>Modello:</strong> Redditi PF oppure 730</li>
+            <li><strong>Quadro:</strong> RL - Sezione II-A "Altri redditi"</li>
+            <li><strong>Rigo:</strong> RL15 o RL16</li>
+            <li><strong>Importo:</strong> Reddito LORDO (prima della commissione MQL5)</li>
+            <li><strong>Costi deducibili:</strong> Commissione MQL5 20%</li>
+            <li><strong>INPS:</strong> Obbligatoria solo se reddito > €5.000</li>
+          </ul>
+        </div>
+      </div>
+
+      <!-- ==================== EXPORT TAB ==================== -->
+      <div id="tab-export" class="panel">
+        
+        <div class="card">
+          <div class="card-title">📥 Export Dati</div>
+          <p style="color:rgba(255,255,255,0.6);margin-bottom:20px;">
+            Scarica un backup completo di tutti i dati (vendite + licenze) in formato JSON.
+          </p>
+          
+          <div class="year-selector">
+            <label>Anno vendite:</label>
+            <select id="exportYear">
+              <option value="">Tutti gli anni</option>
+              <option value="2024">2024</option>
+              <option value="2025">2025</option>
+              <option value="2026" selected>2026</option>
+            </select>
+          </div>
+          
+          <div class="btn-group">
+            <button class="btn btn-primary" onclick="exportJSON()">📥 Scarica JSON</button>
+            <button class="btn btn-success" onclick="generateTaxReport()">📄 Report Fiscale PDF</button>
+          </div>
+        </div>
+        
+        <div class="card">
+          <div class="card-title">📤 Importa Dati</div>
+          <p style="color:rgba(255,255,255,0.6);margin-bottom:20px;">
+            Carica un file JSON esportato in precedenza per ripristinare i dati.
+          </p>
+          <input type="file" id="importFile" accept=".json" style="display:none;" onchange="importJSON(event)">
+          <button class="btn btn-secondary" onclick="document.getElementById('importFile').click()">📂 Carica JSON</button>
+        </div>
+        
+        <div class="card" style="background:rgba(239,68,68,0.05);border-color:rgba(239,68,68,0.2);">
+          <div class="card-title" style="color:#ef4444;">⚠️ Zona Pericolosa</div>
+          <p style="color:rgba(255,255,255,0.6);margin-bottom:16px;">
+            Esporta sempre un backup prima di effettuare operazioni distruttive.
+          </p>
+          <button class="btn btn-danger" onclick="clearAllData()">🗑️ Cancella tutti i dati</button>
+        </div>
+      </div>
+      
+    </div>
+  </div>
+
+  <script>
+    // ==================== GLOBALS ====================
+    let adminPassword = '';
+    let sales = [];
+    let licenses = [];
+    let altriRedditiValue = 0;
+    
+    const $ = id => document.getElementById(id);
+    
+    // ==================== AUTH ====================
+    async function login() {
+      adminPassword = $('password').value;
+      if (!adminPassword) {
+        $('loginError').textContent = 'Inserisci la password';
+        return;
+      }
+      
+      try {
+        const res = await fetch('/api/admin?type=licenses', {
+          headers: { 'Authorization': `Bearer ${adminPassword}` }
+        });
+        
+        if (!res.ok) {
+          $('loginError').textContent = 'Password errata';
+          return;
+        }
+        
+        localStorage.setItem('eaDashPwd', adminPassword);
+        $('loginPanel').classList.remove('active');
+        $('mainPanel').classList.add('active');
+        
+        loadSales();
+        loadLicenses();
+        
+      } catch (err) {
+        $('loginError').textContent = 'Errore di connessione';
+      }
+    }
+    
+    function logout() {
+      adminPassword = '';
+      localStorage.removeItem('eaDashPwd');
+      $('mainPanel').classList.remove('active');
+      $('loginPanel').classList.add('active');
+      $('password').value = '';
+    }
+    
+    // ==================== TABS ====================
+    document.querySelectorAll('.tab').forEach(tab => {
+      tab.addEventListener('click', () => {
+        document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+        document.querySelectorAll('.panel').forEach(p => {
+          if (p.id.startsWith('tab-')) p.classList.remove('active');
+        });
+        
+        tab.classList.add('active');
+        const tabId = 'tab-' + tab.dataset.tab;
+        $(tabId).classList.add('active');
+        
+        if (tab.dataset.tab === 'tasse') loadTaxData();
+      });
+    });
+    
+    // ==================== STATUS ====================
+    function showStatus(msg, isError = false) {
+      const el = $('statusMsg');
+      el.innerHTML = `<div class="status ${isError ? 'error' : 'success'}">${msg}</div>`;
+      setTimeout(() => el.innerHTML = '', 4000);
+    }
+    
+    // ==================== SALES ====================
+    async function loadSales() {
+      const year = $('salesYear').value;
+      
+      try {
+        const res = await fetch(`/api/admin?type=sales&year=${year}`, {
+          headers: { 'Authorization': `Bearer ${adminPassword}` }
+        });
+        
+        if (!res.ok) throw new Error('Failed to load');
+        
+        const data = await res.json();
+        sales = data.sales || [];
+        renderSales();
+        
+      } catch (err) {
+        showStatus('Errore caricamento vendite', true);
+      }
+    }
+    
+    function renderSales() {
+      const tbody = $('salesTable');
+      
+      if (sales.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:rgba(255,255,255,0.4);">Nessuna vendita per questo anno</td></tr>';
+        updateSalesStats();
+        return;
+      }
+      
+      tbody.innerHTML = sales.map(s => {
+        const sourceLabel = s.source === 'market' ? 'Market' : (s.source === 'private' ? 'Private' : '🎁 Free');
+        const isFree = s.source === 'free';
+        return `
+        <tr>
+          <td>${formatDate(s.sale_date)}</td>
+          <td>${s.ea_product.replace('_', ' ')}</td>
+          <td><span class="source-badge source-${s.source}">${sourceLabel}</span></td>
+          <td class="text-right mono">${isFree ? '-' : '$' + s.amount_usd.toFixed(2)}</td>
+          <td class="text-right mono">${isFree ? '-' : s.exchange_rate.toFixed(4)}</td>
+          <td class="text-right mono">${isFree ? '-' : '€' + s.amount_eur_gross.toFixed(2)}</td>
+          <td class="text-right mono ${isFree ? '' : 'green'}">${isFree ? 'Free' : '€' + s.amount_eur_net.toFixed(2)}</td>
+          <td><button class="btn btn-danger" onclick="deleteSale(${s.id})">🗑️</button></td>
+        </tr>
+      `}).join('');
+      
+      updateSalesStats();
+    }
+    
+    function updateSalesStats() {
+      const market = sales.filter(s => s.source === 'market');
+      const priv = sales.filter(s => s.source === 'private');
+      const free = sales.filter(s => s.source === 'free');
+      // Escludi Free dal totale EUR (non genera reddito)
+      const totalNet = sales.filter(s => s.source !== 'free').reduce((sum, s) => sum + s.amount_eur_net, 0);
+      
+      $('statTotaleSales').textContent = sales.length;
+      $('statMarket').textContent = market.length;
+      $('statPrivate').textContent = priv.length;
+      $('statFree').textContent = free.length;
+      $('statTotaleEUR').textContent = '€' + totalNet.toFixed(0);
+    }
+    
+    function toggleSaleForm() {
+      const form = $('saleForm');
+      form.style.display = form.style.display === 'none' ? 'block' : 'none';
+      
+      if (form.style.display === 'block') {
+        $('saleDate').value = new Date().toISOString().split('T')[0];
+        fetchExchangeRate();
+      }
+    }
+    
+    function togglePrivateFields() {
+      const source = $('saleSource').value;
+      const isPrivateOrFree = (source === 'private' || source === 'free');
+      const isFree = (source === 'free');
+      
+      $('privateFields').style.display = isPrivateOrFree ? 'block' : 'none';
+      
+      // Per Free: importo = 0, disabilita campo
+      if (isFree) {
+        $('saleAmountUSD').value = '0';
+        $('saleAmountUSD').disabled = true;
+        $('saleAmountUSD').style.opacity = '0.5';
+        $('salePreviewEUR').value = '€0.00 (Free)';
+      } else {
+        $('saleAmountUSD').disabled = false;
+        $('saleAmountUSD').style.opacity = '1';
+        if ($('saleAmountUSD').value === '0') {
+          $('saleAmountUSD').value = '';
+        }
+        updateSalePreview();
+      }
+    }
+    
+    function updateSalePreview() {
+      const usd = parseFloat($('saleAmountUSD').value) || 0;
+      const rate = parseFloat($('saleExchangeRate').value) || 1;
+      const netEUR = (usd / rate) * 0.80;
+      $('salePreviewEUR').value = '€' + netEUR.toFixed(2);
+    }
+    
+    async function fetchExchangeRate() {
+      try {
+        const date = $('saleDate').value || new Date().toISOString().split('T')[0];
+        const res = await fetch(`https://api.frankfurter.app/${date}?from=USD&to=EUR`);
+        const data = await res.json();
+        const rate = 1 / data.rates.EUR;
+        $('saleExchangeRate').value = rate.toFixed(4);
+        updateSalePreview();
+      } catch {
+        $('saleExchangeRate').value = '1.0850';
+        updateSalePreview();
+      }
+    }
+    
+    async function saveSale() {
+      const source = $('saleSource').value;
+      const isFree = (source === 'free');
+      
+      const saleData = {
+        sale_date: $('saleDate').value,
+        ea_product: $('saleProduct').value,
+        source: source,
+        amount_usd: isFree ? '0' : $('saleAmountUSD').value,
+        exchange_rate: $('saleExchangeRate').value || '1',
+        notes: $('saleNotes').value
+      };
+      
+      // Per private e free: dati cliente
+      if (source === 'private' || source === 'free') {
+        saleData.client_name = $('saleClientName').value;
+        saleData.account_number = $('saleAccountNumber').value;
+        saleData.create_license = (source === 'free') ? true : $('saleCreateLicense').checked;
+        
+        // Per free, cliente e account sono obbligatori
+        if (isFree && (!saleData.client_name || !saleData.account_number)) {
+          showStatus('Per un regalo Free, inserisci nome cliente e account!', true);
+          return;
+        }
+      }
+      
+      if (!saleData.sale_date) {
+        showStatus('Inserisci la data', true);
+        return;
+      }
+      
+      if (!isFree && (!saleData.amount_usd || !saleData.exchange_rate)) {
+        showStatus('Compila importo e cambio', true);
+        return;
+      }
+      
+      try {
+        const res = await fetch('/api/admin?type=sales', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${adminPassword}`
+          },
+          body: JSON.stringify(saleData)
+        });
+        
+        const data = await res.json();
+        
+        if (!res.ok) {
+          showStatus(data.error || 'Errore', true);
+          return;
+        }
+        
+        let msg = '✅ Vendita salvata!';
+        if (data.licenseCreated) msg += ' + Licenza creata automaticamente!';
+        
+        showStatus(msg);
+        toggleSaleForm();
+        loadSales();
+        if (data.licenseCreated) loadLicenses();
+        
+        // Reset form
+        $('saleAmountUSD').value = '';
+        $('saleNotes').value = '';
+        $('saleClientName').value = '';
+        $('saleAccountNumber').value = '';
+        
+      } catch (err) {
+        showStatus('Errore di rete', true);
+      }
+    }
+    
+    async function deleteSale(id) {
+      if (!confirm('Eliminare questa vendita?')) return;
+      
+      try {
+        const res = await fetch('/api/admin?type=sales', {
+          method: 'DELETE',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${adminPassword}`
+          },
+          body: JSON.stringify({ id })
+        });
+        
+        if (!res.ok) {
+          showStatus('Errore eliminazione', true);
+          return;
+        }
+        
+        showStatus('✅ Vendita eliminata');
+        loadSales();
+        
+      } catch (err) {
+        showStatus('Errore di rete', true);
+      }
+    }
+    
+    // ==================== LICENSES ====================
+    async function loadLicenses() {
+      try {
+        const res = await fetch('/api/admin?type=licenses', {
+          headers: { 'Authorization': `Bearer ${adminPassword}` }
+        });
+        
+        if (!res.ok) throw new Error('Failed');
+        
+        const data = await res.json();
+        licenses = data.licenses || [];
+        renderLicenses();
+        
+      } catch (err) {
+        showStatus('Errore caricamento licenze', true);
+      }
+    }
+    
+    function renderLicenses() {
+      const tbody = $('licensesTable');
+      
+      if (licenses.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:rgba(255,255,255,0.4);">Nessuna licenza attiva</td></tr>';
+        updateLicenseStats();
+        return;
+      }
+      
+      tbody.innerHTML = licenses.map(l => `
+        <tr>
+          <td class="mono">${l.account_number}</td>
+          <td>${l.client_name}</td>
+          <td>${l.ea_product.replace('_', ' ')}</td>
+          <td>${formatDate(l.created_at)}</td>
+          <td><button class="btn btn-danger" onclick="deleteLicense(${l.id})">🗑️</button></td>
+        </tr>
+      `).join('');
+      
+      updateLicenseStats();
+    }
+    
+    function updateLicenseStats() {
+      const xau = licenses.filter(l => l.ea_product === 'XAU_AutoTrader');
+      const btc = licenses.filter(l => l.ea_product === 'BTC_AutoTrader');
+      
+      $('statTotaleLicenses').textContent = licenses.length;
+      $('statXAU').textContent = xau.length;
+      $('statBTC').textContent = btc.length;
+    }
+    
+    function toggleLicenseForm() {
+      const form = $('licenseForm');
+      form.style.display = form.style.display === 'none' ? 'block' : 'none';
+    }
+    
+    async function saveLicense() {
+      const licenseData = {
+        account_number: $('licAccountNumber').value.trim(),
+        client_name: $('licClientName').value.trim(),
+        ea_product: $('licProduct').value
+      };
+      
+      if (!licenseData.account_number || !licenseData.client_name) {
+        showStatus('Compila tutti i campi', true);
+        return;
+      }
+      
+      try {
+        const res = await fetch('/api/admin?type=licenses', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${adminPassword}`
+          },
+          body: JSON.stringify(licenseData)
+        });
+        
+        const data = await res.json();
+        
+        if (!res.ok) {
+          showStatus(data.error || 'Errore', true);
+          return;
+        }
+        
+        showStatus('✅ Licenza creata!');
+        toggleLicenseForm();
+        loadLicenses();
+        
+        $('licAccountNumber').value = '';
+        $('licClientName').value = '';
+        
+      } catch (err) {
+        showStatus('Errore di rete', true);
+      }
+    }
+    
+    async function deleteLicense(id) {
+      if (!confirm('Eliminare questa licenza?')) return;
+      
+      try {
+        const res = await fetch('/api/admin?type=licenses', {
+          method: 'DELETE',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${adminPassword}`
+          },
+          body: JSON.stringify({ id })
+        });
+        
+        if (!res.ok) {
+          showStatus('Errore eliminazione', true);
+          return;
+        }
+        
+        showStatus('✅ Licenza eliminata');
+        loadLicenses();
+        
+      } catch (err) {
+        showStatus('Errore di rete', true);
+      }
+    }
+    
+    // ==================== TAXES ====================
+    async function loadTaxData() {
+      const year = $('taxYear').value;
+      
+      try {
+        const res = await fetch(`/api/admin?type=sales&year=${year}`, {
+          headers: { 'Authorization': `Bearer ${adminPassword}` }
+        });
+        
+        if (!res.ok) throw new Error('Failed');
+        
+        const data = await res.json();
+        sales = data.sales || [];
+        calculateTaxes();
+        
+      } catch (err) {
+        showStatus('Errore caricamento dati fiscali', true);
+      }
+    }
+    
+    function calculateTaxes() {
+      // Escludi Free dal calcolo tasse
+      const taxableSales = sales.filter(s => s.source !== 'free');
+      const totLordoEUR = taxableSales.reduce((sum, s) => sum + s.amount_eur_gross, 0);
+      const totNettoEUR = taxableSales.reduce((sum, s) => sum + s.amount_eur_net, 0);
+      const commissioneMQL5 = totLordoEUR - totNettoEUR;
+      
+      altriRedditiValue = parseFloat($('altriRedditi').value) || 0;
+      
+      const redditoImponibileMQL5 = totNettoEUR; // Lordo - commissione
+      const redditoTotale = redditoImponibileMQL5 + altriRedditiValue;
+      
+      // IRPEF progressiva italiana
+      let irpefTotale = 0;
+      let remaining = redditoTotale;
+      
+      if (remaining > 0) {
+        const first = Math.min(remaining, 28000);
+        irpefTotale += first * 0.23;
+        remaining -= first;
+      }
+      if (remaining > 0) {
+        const second = Math.min(remaining, 22000); // 28k-50k
+        irpefTotale += second * 0.35;
+        remaining -= second;
+      }
+      if (remaining > 0) {
+        irpefTotale += remaining * 0.43;
+      }
+      
+      // Proporzione IRPEF su MQL5
+      const proporzione = redditoTotale > 0 ? redditoImponibileMQL5 / redditoTotale : 0;
+      const irpefMQL5 = irpefTotale * proporzione;
+      
+      // INPS (solo se > 5000€)
+      const sogliaINPS = 5000;
+      const aliquotaINPS = 0.2607;
+      let inps = 0;
+      if (redditoImponibileMQL5 > sogliaINPS) {
+        inps = redditoImponibileMQL5 * aliquotaINPS;
+      }
+      
+      // Addizionali (stima 2%)
+      const addizionali = irpefMQL5 * 0.087;
+      
+      const totaleImposte = irpefMQL5 + inps + addizionali;
+      
+      // Update UI
+      $('taxLordoEUR').textContent = '€' + totLordoEUR.toFixed(0);
+      $('taxNettoEUR').textContent = '€' + totNettoEUR.toFixed(0);
+      $('taxTotale').textContent = '€' + totaleImposte.toFixed(0);
+      
+      const inpsNote = redditoImponibileMQL5 > sogliaINPS 
+        ? `<span style="color:#ef4444;">⚠️ Superata soglia €5.000</span>`
+        : `<span style="color:#22c55e;">Sotto soglia €5.000</span>`;
+      
+      $('taxBreakdown').innerHTML = `
+        <div class="tax-row">
+          <span class="tax-label">Reddito lordo MQL5</span>
+          <span class="tax-value">€${totLordoEUR.toFixed(2)}</span>
+        </div>
+        <div class="tax-row">
+          <span class="tax-label">Commissione MQL5 deducibile (20%)</span>
+          <span class="tax-value green">- €${commissioneMQL5.toFixed(2)}</span>
+        </div>
+        <div class="tax-row">
+          <span class="tax-label">Reddito imponibile MQL5</span>
+          <span class="tax-value">€${redditoImponibileMQL5.toFixed(2)}</span>
+        </div>
+        <div class="tax-row">
+          <span class="tax-label">Altri redditi</span>
+          <span class="tax-value">€${altriRedditiValue.toFixed(2)}</span>
+        </div>
+        <div class="tax-row">
+          <span class="tax-label">Reddito complessivo</span>
+          <span class="tax-value">€${redditoTotale.toFixed(2)}</span>
+        </div>
+        <hr style="border-color:rgba(255,255,255,0.1);margin:12px 0;">
+        <div class="tax-row">
+          <span class="tax-label">IRPEF su MQL5 (aliquota marginale)</span>
+          <span class="tax-value red">€${irpefMQL5.toFixed(2)}</span>
+        </div>
+        <div class="tax-row">
+          <span class="tax-label">INPS Gestione Separata (26.07%) ${inpsNote}</span>
+          <span class="tax-value red">€${inps.toFixed(2)}</span>
+        </div>
+        <div class="tax-row">
+          <span class="tax-label">Addizionali regionali/comunali (stima)</span>
+          <span class="tax-value red">€${addizionali.toFixed(2)}</span>
+        </div>
+        <div class="tax-total">
+          <div class="tax-total-label">TOTALE IMPOSTE STIMATE</div>
+          <div class="tax-total-value">€${totaleImposte.toFixed(2)}</div>
+        </div>
+      `;
+    }
+    
+    // ==================== EXPORT ====================
+    async function exportJSON() {
+      const year = $('exportYear').value;
+      
+      try {
+        const url = year ? `/api/admin?type=export&year=${year}` : '/api/admin?type=export';
+        const res = await fetch(url, {
+          headers: { 'Authorization': `Bearer ${adminPassword}` }
+        });
+        
+        if (!res.ok) throw new Error('Failed');
+        
+        const data = await res.json();
+        
+        const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+        const url2 = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url2;
+        a.download = `EA-Dashboard-Backup-${year || 'ALL'}-${new Date().toISOString().split('T')[0]}.json`;
+        a.click();
+        URL.revokeObjectURL(url2);
+        
+        showStatus('✅ Export completato!');
+        
+      } catch (err) {
+        showStatus('Errore export', true);
+      }
+    }
+    
+    async function importJSON(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+      
+      if (!confirm('ATTENZIONE: Questo importerà i dati dal file. Vuoi continuare?')) {
+        event.target.value = '';
+        return;
+      }
+      
+      const reader = new FileReader();
+      reader.onload = async (e) => {
+        try {
+          const data = JSON.parse(e.target.result);
+          
+          // TODO: Implement import logic via API
+          showStatus('⚠️ Import non ancora implementato. Contatta lo sviluppatore.', true);
+          
+        } catch (err) {
+          showStatus('File JSON non valido', true);
+        }
+      };
+      reader.readAsText(file);
+      event.target.value = '';
+    }
+    
+    function generateTaxReport() {
+      const year = $('taxYear').value;
+      // Escludi Free dal report fiscale
+      const taxableSales = sales.filter(s => s.source !== 'free');
+      const totLordoEUR = taxableSales.reduce((sum, s) => sum + s.amount_eur_gross, 0);
+      const totNettoEUR = taxableSales.reduce((sum, s) => sum + s.amount_eur_net, 0);
+      const freeSales = sales.filter(s => s.source === 'free');
+      
+      // Open in new window with print-friendly HTML
+      const reportWindow = window.open('', '_blank');
+      reportWindow.document.write(`
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <title>Report Fiscale MQL5 - ${year}</title>
+          <style>
+            body { font-family: Arial, sans-serif; padding: 40px; max-width: 800px; margin: 0 auto; }
+            h1 { color: #f7931a; border-bottom: 3px solid #f7931a; padding-bottom: 10px; }
+            table { width: 100%; border-collapse: collapse; margin: 20px 0; }
+            th, td { padding: 12px; text-align: left; border-bottom: 1px solid #ddd; }
+            th { background: #f5f5f5; }
+            .total { font-weight: bold; font-size: 1.2em; color: #f7931a; }
+            .info { background: #e3f2fd; padding: 15px; border-radius: 8px; margin: 20px 0; }
+            @media print { body { padding: 20px; } }
+          </style>
+        </head>
+        <body>
+          <h1>📊 Report Fiscale MQL5 - Anno ${year}</h1>
+          <p>Generato il ${formatDate(new Date().toISOString())}</p>
+          
+          <h2>Riepilogo</h2>
+          <table>
+            <tr><td>Numero vendite (tassabili)</td><td>${taxableSales.length}</td></tr>
+            <tr><td>Regali gratuiti (non tassabili)</td><td>${freeSales.length}</td></tr>
+            <tr><td>Totale lordo EUR</td><td>€${totLordoEUR.toFixed(2)}</td></tr>
+            <tr><td>Commissione MQL5 (20%)</td><td>- €${(totLordoEUR - totNettoEUR).toFixed(2)}</td></tr>
+            <tr class="total"><td>Totale netto EUR (incassato)</td><td>€${totNettoEUR.toFixed(2)}</td></tr>
+          </table>
+          
+          <div class="info">
+            <strong>📝 Da dichiarare nel Quadro RL:</strong> €${totLordoEUR.toFixed(2)} (lordo)
+          </div>
+          
+          <h2>Dettaglio Vendite (esclusi Free)</h2>
+          <table>
+            <tr><th>Data</th><th>Prodotto</th><th>Fonte</th><th>USD</th><th>EUR Lordo</th><th>EUR Netto</th></tr>
+            ${taxableSales.map(s => `
+              <tr>
+                <td>${formatDate(s.sale_date)}</td>
+                <td>${s.ea_product}</td>
+                <td>${s.source}</td>
+                <td>$${s.amount_usd.toFixed(2)}</td>
+                <td>€${s.amount_eur_gross.toFixed(2)}</td>
+                <td>€${s.amount_eur_net.toFixed(2)}</td>
+              </tr>
+            `).join('')}
+          </table>
+          
+          <p style="margin-top:40px;color:#666;font-size:12px;">
+            ⚠️ Documento indicativo - Consultare un commercialista per la dichiarazione ufficiale
+          </p>
+          
+          <button onclick="window.print()" style="margin-top:20px;padding:10px 20px;background:#f7931a;color:white;border:none;border-radius:5px;cursor:pointer;">
+            🖨️ Stampa / Salva PDF
+          </button>
+        </body>
+        </html>
+      `);
+      reportWindow.document.close();
+    }
+    
+    function clearAllData() {
+      if (!confirm('⚠️ ATTENZIONE: Questa azione cancellerà TUTTI i dati (vendite e licenze). Sei sicuro?')) return;
+      if (!confirm('🚨 ULTIMA CONFERMA: Hai esportato un backup? Questa azione è IRREVERSIBILE.')) return;
+      
+      showStatus('⚠️ Cancellazione massiva non implementata per sicurezza. Elimina i record singolarmente.', true);
+    }
+    
+    // ==================== UTILS ====================
+    function formatDate(dateStr) {
+      if (!dateStr) return '-';
+      const d = new Date(dateStr);
+      return d.toLocaleDateString('it-IT');
+    }
+    
+    // ==================== INIT ====================
+    window.onload = () => {
+      // Set current year
+      const currentYear = new Date().getFullYear();
+      $('salesYear').value = currentYear;
+      $('taxYear').value = currentYear;
+      $('exportYear').value = currentYear;
+      
+      // Check saved password
+      const saved = localStorage.getItem('eaDashPwd');
+      if (saved) {
+        adminPassword = saved;
+        fetch('/api/admin?type=licenses', {
+          headers: { 'Authorization': `Bearer ${adminPassword}` }
+        }).then(res => {
+          if (res.ok) {
+            $('loginPanel').classList.remove('active');
+            $('mainPanel').classList.add('active');
+            loadSales();
+            loadLicenses();
+          } else {
+            localStorage.removeItem('eaDashPwd');
+          }
+        }).catch(() => {
+          localStorage.removeItem('eaDashPwd');
+        });
+      }
+    };
+  </script>
+</body>
+</html>
