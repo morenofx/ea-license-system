@@ -41,7 +41,7 @@ export default async function handler(req, res) {
 
       // POST - Add new license
       if (req.method === 'POST') {
-        const { account_number, client_name, ea_product } = req.body;
+        const { account_number, client_name, ea_product, license_type } = req.body;
 
         if (!account_number || !client_name || !ea_product) {
           return res.status(400).json({ error: 'Missing required fields' });
@@ -61,7 +61,7 @@ export default async function handler(req, res) {
 
         const { data, error } = await supabase
           .from('licenses')
-          .insert([{ account_number, client_name, ea_product }])
+          .insert([{ account_number, client_name, ea_product, license_type: license_type || 'paid' }])
           .select()
           .single();
 
@@ -182,9 +182,10 @@ export default async function handler(req, res) {
             .single();
 
           if (!existingLic) {
+            const licenseType = source === 'free' ? 'free' : 'paid';
             await supabase
               .from('licenses')
-              .insert([{ account_number, client_name, ea_product }]);
+              .insert([{ account_number, client_name, ea_product, license_type: licenseType }]);
             licenseCreated = true;
           }
         }

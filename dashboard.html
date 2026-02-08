@@ -256,6 +256,9 @@
     .source-private { background: rgba(255, 215, 0, 0.15); color: #ffd700; }
     .source-free { background: rgba(34, 197, 94, 0.15); color: #22c55e; }
     
+    .type-paid { background: rgba(255, 215, 0, 0.15); color: #ffd700; }
+    .type-free { background: rgba(34, 197, 94, 0.15); color: #22c55e; }
+    
     /* Login */
     .login-box {
       max-width: 400px;
@@ -409,10 +412,6 @@
             <div class="stat-label">Private</div>
           </div>
           <div class="stat-card">
-            <div class="stat-number" style="color:#22c55e;" id="statFree">0</div>
-            <div class="stat-label">🎁 Free</div>
-          </div>
-          <div class="stat-card">
             <div class="stat-number green" id="statTotaleEUR">€0</div>
             <div class="stat-label">Totale Netto EUR</div>
           </div>
@@ -450,7 +449,6 @@
               <select id="saleSource" onchange="togglePrivateFields()">
                 <option value="market">MQL5 Market</option>
                 <option value="private">Vendita Privata</option>
-                <option value="free">🎁 Free / Regalo</option>
               </select>
             </div>
           </div>
@@ -540,6 +538,14 @@
             <div class="stat-number blue" id="statBTC">0</div>
             <div class="stat-label">BTC_AutoTrader</div>
           </div>
+          <div class="stat-card">
+            <div class="stat-number" style="color:#ffd700;" id="statPaid">0</div>
+            <div class="stat-label">💰 Paid</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-number" style="color:#22c55e;" id="statFreeLic">0</div>
+            <div class="stat-label">🎁 Free</div>
+          </div>
         </div>
         
         <button class="btn btn-secondary" onclick="toggleLicenseForm()" style="margin-bottom:16px;">+ Aggiungi Licenza</button>
@@ -563,6 +569,13 @@
                 <option value="BTC_AutoTrader">BTC_AutoTrader</option>
               </select>
             </div>
+            <div class="form-group">
+              <label>Tipo Licenza</label>
+              <select id="licType">
+                <option value="paid">💰 Paid</option>
+                <option value="free">🎁 Free</option>
+              </select>
+            </div>
           </div>
           <div class="btn-group">
             <button class="btn btn-primary" onclick="saveLicense()">💾 Salva Licenza</button>
@@ -580,12 +593,13 @@
                   <th>Account</th>
                   <th>Cliente</th>
                   <th>Prodotto</th>
+                  <th>Tipo</th>
                   <th>Data Creazione</th>
                   <th>Azioni</th>
                 </tr>
               </thead>
               <tbody id="licensesTable">
-                <tr><td colspan="5" style="text-align:center;color:rgba(255,255,255,0.4);">Caricamento...</td></tr>
+                <tr><td colspan="6" style="text-align:center;color:rgba(255,255,255,0.4);">Caricamento...</td></tr>
               </tbody>
             </table>
           </div>
@@ -797,21 +811,18 @@
         return;
       }
       
-      tbody.innerHTML = sales.map(s => {
-        const sourceLabel = s.source === 'market' ? 'Market' : (s.source === 'private' ? 'Private' : '🎁 Free');
-        const isFree = s.source === 'free';
-        return `
+      tbody.innerHTML = sales.map(s => `
         <tr>
           <td>${formatDate(s.sale_date)}</td>
           <td>${s.ea_product.replace('_', ' ')}</td>
-          <td><span class="source-badge source-${s.source}">${sourceLabel}</span></td>
-          <td class="text-right mono">${isFree ? '-' : '$' + s.amount_usd.toFixed(2)}</td>
-          <td class="text-right mono">${isFree ? '-' : s.exchange_rate.toFixed(4)}</td>
-          <td class="text-right mono">${isFree ? '-' : '€' + s.amount_eur_gross.toFixed(2)}</td>
-          <td class="text-right mono ${isFree ? '' : 'green'}">${isFree ? 'Free' : '€' + s.amount_eur_net.toFixed(2)}</td>
+          <td><span class="source-badge source-${s.source}">${s.source === 'market' ? 'Market' : 'Private'}</span></td>
+          <td class="text-right mono">$${s.amount_usd.toFixed(2)}</td>
+          <td class="text-right mono">${s.exchange_rate.toFixed(4)}</td>
+          <td class="text-right mono">€${s.amount_eur_gross.toFixed(2)}</td>
+          <td class="text-right mono green">€${s.amount_eur_net.toFixed(2)}</td>
           <td><button class="btn btn-danger" onclick="deleteSale(${s.id})">🗑️</button></td>
         </tr>
-      `}).join('');
+      `).join('');
       
       updateSalesStats();
     }
@@ -819,14 +830,11 @@
     function updateSalesStats() {
       const market = sales.filter(s => s.source === 'market');
       const priv = sales.filter(s => s.source === 'private');
-      const free = sales.filter(s => s.source === 'free');
-      // Escludi Free dal totale EUR (non genera reddito)
-      const totalNet = sales.filter(s => s.source !== 'free').reduce((sum, s) => sum + s.amount_eur_net, 0);
+      const totalNet = sales.reduce((sum, s) => sum + s.amount_eur_net, 0);
       
       $('statTotaleSales').textContent = sales.length;
       $('statMarket').textContent = market.length;
       $('statPrivate').textContent = priv.length;
-      $('statFree').textContent = free.length;
       $('statTotaleEUR').textContent = '€' + totalNet.toFixed(0);
     }
     
@@ -841,26 +849,8 @@
     }
     
     function togglePrivateFields() {
-      const source = $('saleSource').value;
-      const isPrivateOrFree = (source === 'private' || source === 'free');
-      const isFree = (source === 'free');
-      
-      $('privateFields').style.display = isPrivateOrFree ? 'block' : 'none';
-      
-      // Per Free: importo = 0, disabilita campo
-      if (isFree) {
-        $('saleAmountUSD').value = '0';
-        $('saleAmountUSD').disabled = true;
-        $('saleAmountUSD').style.opacity = '0.5';
-        $('salePreviewEUR').value = '€0.00 (Free)';
-      } else {
-        $('saleAmountUSD').disabled = false;
-        $('saleAmountUSD').style.opacity = '1';
-        if ($('saleAmountUSD').value === '0') {
-          $('saleAmountUSD').value = '';
-        }
-        updateSalePreview();
-      }
+      const isPrivate = $('saleSource').value === 'private';
+      $('privateFields').style.display = isPrivate ? 'block' : 'none';
     }
     
     function updateSalePreview() {
@@ -886,37 +876,24 @@
     
     async function saveSale() {
       const source = $('saleSource').value;
-      const isFree = (source === 'free');
       
       const saleData = {
         sale_date: $('saleDate').value,
         ea_product: $('saleProduct').value,
         source: source,
-        amount_usd: isFree ? '0' : $('saleAmountUSD').value,
-        exchange_rate: $('saleExchangeRate').value || '1',
+        amount_usd: $('saleAmountUSD').value,
+        exchange_rate: $('saleExchangeRate').value,
         notes: $('saleNotes').value
       };
       
-      // Per private e free: dati cliente
-      if (source === 'private' || source === 'free') {
+      if (source === 'private') {
         saleData.client_name = $('saleClientName').value;
         saleData.account_number = $('saleAccountNumber').value;
-        saleData.create_license = (source === 'free') ? true : $('saleCreateLicense').checked;
-        
-        // Per free, cliente e account sono obbligatori
-        if (isFree && (!saleData.client_name || !saleData.account_number)) {
-          showStatus('Per un regalo Free, inserisci nome cliente e account!', true);
-          return;
-        }
+        saleData.create_license = $('saleCreateLicense').checked;
       }
       
-      if (!saleData.sale_date) {
-        showStatus('Inserisci la data', true);
-        return;
-      }
-      
-      if (!isFree && (!saleData.amount_usd || !saleData.exchange_rate)) {
-        showStatus('Compila importo e cambio', true);
+      if (!saleData.sale_date || !saleData.amount_usd || !saleData.exchange_rate) {
+        showStatus('Compila tutti i campi obbligatori', true);
         return;
       }
       
@@ -1004,20 +981,24 @@
       const tbody = $('licensesTable');
       
       if (licenses.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:rgba(255,255,255,0.4);">Nessuna licenza attiva</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:rgba(255,255,255,0.4);">Nessuna licenza attiva</td></tr>';
         updateLicenseStats();
         return;
       }
       
-      tbody.innerHTML = licenses.map(l => `
+      tbody.innerHTML = licenses.map(l => {
+        const licType = l.license_type || 'paid';
+        const typeLabel = licType === 'free' ? '🎁 Free' : '💰 Paid';
+        return `
         <tr>
           <td class="mono">${l.account_number}</td>
           <td>${l.client_name}</td>
           <td>${l.ea_product.replace('_', ' ')}</td>
+          <td><span class="source-badge type-${licType}">${typeLabel}</span></td>
           <td>${formatDate(l.created_at)}</td>
           <td><button class="btn btn-danger" onclick="deleteLicense(${l.id})">🗑️</button></td>
         </tr>
-      `).join('');
+      `}).join('');
       
       updateLicenseStats();
     }
@@ -1025,10 +1006,14 @@
     function updateLicenseStats() {
       const xau = licenses.filter(l => l.ea_product === 'XAU_AutoTrader');
       const btc = licenses.filter(l => l.ea_product === 'BTC_AutoTrader');
+      const paid = licenses.filter(l => (l.license_type || 'paid') === 'paid');
+      const free = licenses.filter(l => l.license_type === 'free');
       
       $('statTotaleLicenses').textContent = licenses.length;
       $('statXAU').textContent = xau.length;
       $('statBTC').textContent = btc.length;
+      $('statPaid').textContent = paid.length;
+      $('statFreeLic').textContent = free.length;
     }
     
     function toggleLicenseForm() {
@@ -1040,7 +1025,8 @@
       const licenseData = {
         account_number: $('licAccountNumber').value.trim(),
         client_name: $('licClientName').value.trim(),
-        ea_product: $('licProduct').value
+        ea_product: $('licProduct').value,
+        license_type: $('licType').value
       };
       
       if (!licenseData.account_number || !licenseData.client_name) {
@@ -1124,10 +1110,8 @@
     }
     
     function calculateTaxes() {
-      // Escludi Free dal calcolo tasse
-      const taxableSales = sales.filter(s => s.source !== 'free');
-      const totLordoEUR = taxableSales.reduce((sum, s) => sum + s.amount_eur_gross, 0);
-      const totNettoEUR = taxableSales.reduce((sum, s) => sum + s.amount_eur_net, 0);
+      const totLordoEUR = sales.reduce((sum, s) => sum + s.amount_eur_gross, 0);
+      const totNettoEUR = sales.reduce((sum, s) => sum + s.amount_eur_net, 0);
       const commissioneMQL5 = totLordoEUR - totNettoEUR;
       
       altriRedditiValue = parseFloat($('altriRedditi').value) || 0;
@@ -1276,11 +1260,8 @@
     
     function generateTaxReport() {
       const year = $('taxYear').value;
-      // Escludi Free dal report fiscale
-      const taxableSales = sales.filter(s => s.source !== 'free');
-      const totLordoEUR = taxableSales.reduce((sum, s) => sum + s.amount_eur_gross, 0);
-      const totNettoEUR = taxableSales.reduce((sum, s) => sum + s.amount_eur_net, 0);
-      const freeSales = sales.filter(s => s.source === 'free');
+      const totLordoEUR = sales.reduce((sum, s) => sum + s.amount_eur_gross, 0);
+      const totNettoEUR = sales.reduce((sum, s) => sum + s.amount_eur_net, 0);
       
       // Open in new window with print-friendly HTML
       const reportWindow = window.open('', '_blank');
@@ -1306,8 +1287,7 @@
           
           <h2>Riepilogo</h2>
           <table>
-            <tr><td>Numero vendite (tassabili)</td><td>${taxableSales.length}</td></tr>
-            <tr><td>Regali gratuiti (non tassabili)</td><td>${freeSales.length}</td></tr>
+            <tr><td>Numero vendite</td><td>${sales.length}</td></tr>
             <tr><td>Totale lordo EUR</td><td>€${totLordoEUR.toFixed(2)}</td></tr>
             <tr><td>Commissione MQL5 (20%)</td><td>- €${(totLordoEUR - totNettoEUR).toFixed(2)}</td></tr>
             <tr class="total"><td>Totale netto EUR (incassato)</td><td>€${totNettoEUR.toFixed(2)}</td></tr>
@@ -1317,10 +1297,10 @@
             <strong>📝 Da dichiarare nel Quadro RL:</strong> €${totLordoEUR.toFixed(2)} (lordo)
           </div>
           
-          <h2>Dettaglio Vendite (esclusi Free)</h2>
+          <h2>Dettaglio Vendite</h2>
           <table>
             <tr><th>Data</th><th>Prodotto</th><th>Fonte</th><th>USD</th><th>EUR Lordo</th><th>EUR Netto</th></tr>
-            ${taxableSales.map(s => `
+            ${sales.map(s => `
               <tr>
                 <td>${formatDate(s.sale_date)}</td>
                 <td>${s.ea_product}</td>
