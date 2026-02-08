@@ -2239,6 +2239,7 @@
     const brokerCountries = {
       'ic markets': { code: '036', name: 'Australia' },
       'icmarkets': { code: '036', name: 'Australia' },
+      'raw trading': { code: '248', name: 'Seychelles' },
       'pepperstone': { code: '036', name: 'Australia' },
       'fpmarkets': { code: '036', name: 'Australia' },
       'fp markets': { code: '036', name: 'Australia' },
@@ -2317,25 +2318,18 @@
             
             for (let i = 0; i < 15; i++) {
               const row = data[i] || [];
-              if (row[0] === 'Name:') accountName = row[3] || '';
-              if (row[0] === 'Account:') {
-                const m = String(row[3] || '').match(/(\d+)/);
+              const cell0 = String(row[0] || '');
+              const cell3 = String(row[3] || '');
+              
+              if (cell0 === 'Name:') accountName = cell3;
+              if (cell0 === 'Account:') {
+                const m = cell3.match(/(\d+)/);
                 if (m) accountNumber = m[1];
+                // Rileva valuta da Account: "7417632 (EUR, ICMarkets...)"
+                if (cell3.includes('(EUR')) currency = 'EUR';
+                else if (cell3.includes('(USD')) currency = 'USD';
               }
-              if (row[0] === 'Company:') company = row[3] || '';
-              if (row[0] === 'Currency:') currency = row[3] || 'USD';
-              // Cerca anche nella colonna B per currency
-              if (String(row[1] || '').toLowerCase().includes('currency')) {
-                currency = String(row[2] || row[3] || 'USD').toUpperCase();
-              }
-            }
-            
-            // Rileva valuta dal contenuto se non trovata
-            if (!currency || currency === 'USD') {
-              const content = JSON.stringify(data).toLowerCase();
-              if (content.includes('eur') && !content.includes('eurusd')) {
-                currency = 'EUR';
-              }
+              if (cell0 === 'Company:') company = cell3;
             }
             
             // Trova broker/paese
@@ -2348,90 +2342,164 @@
               }
             }
             
-            // Trova sezione Deals
+            // Trova sezione Positions (trade completi)
+            let positionsStart = -1;
+            for (let i = 0; i < data.length; i++) {
+              if (data[i][0] === 'Positions') { 
+                positionsStart = i + 2; // Salta header
+                console.log('Trovato Positions alla riga:', i, 'Start parsing:', positionsStart);
+                break; 
+              }
+            }
+            
+            // Processa trade dalla sezione Positions
+            const trades = [];
+            let grossProfit = 0, grossLoss = 0, wins = 0, losses = 0;
+            let valoreIniziale = 0, valoreFinale = 0;
+            
+            if (positionsStart !== -1) {
+              console.log('Prima riga dati:', data[positionsStart]);
+              for (let i = positionsStart; i < data.length; i++) {
+                const row = data[i];
+                let dateStr = row[0];
+                
+                // Gestisci sia stringhe che oggetti Date
+                let tradeDate;
+                if (dateStr instanceof Date) {
+                  tradeDate = dateStr;
+                  dateStr = dateStr.toISOString();
+                } else {
+                  dateStr = String(dateStr || '');
+                  // Stop se nuova sezione o riga vuota
+                  if (!dateStr || (!dateStr.match(/^\d{4}[\.\-]/) && !dateStr.match(/^\d{2}[\.\-]/))) {
+                    if (row[0] && ['Deals', 'Orders', 'Working Orders', 'Results'].includes(String(row[0]))) {
+                      console.log('Stop a riga', i, ':', row[0]);
+                      break;
+                    }
+                    continue;
+                  }
+                  tradeDate = new Date(dateStr.replace(/\./g, '-'));
+                }
+                
+                // Verifica data valida
+                if (!tradeDate || isNaN(tradeDate.getTime())) {
+                  console.log('Data invalida riga', i, ':', dateStr);
+                  continue;
+                }
+                
+                try {
+                  // Colonne Positions: Time, Position, Symbol, Type, Volume, Price, S/L, T/P, Time, Price, Commission, Swap, Profit
+                  const profit = parseFloat(row[12]) || 0;
+                  const symbol = String(row[2] || '');
+                  const volume = parseFloat(String(row[4]).replace(',', '.')) || 0;
+                  const tradeType = String(row[3] || '').toLowerCase();
+                  
+                  if (i === positionsStart) {
+                    console.log('Prima riga parsed:', { dateStr, symbol, tradeType, profit, volume });
+                  }
+                  
+                  if (symbol && (tradeType === 'buy' || tradeType === 'sell')) {
+                    trades.push({
+                      date: tradeDate,
+                      profit: profit,
+                      symbol: symbol,
+                      volume: volume
+                    });
+                    
+                    if (profit > 0) {
+                      grossProfit += profit;
+                      wins++;
+                    } else if (profit < 0) {
+                      grossLoss += profit;
+                      losses++;
+                    }
+                  }
+                } catch (e) {
+                  console.error('Errore riga:', i, e);
+                }
+              }
+            } else {
+              console.log('Positions NON trovato! Sezioni trovate:', data.slice(0, 20).map(r => r[0]).filter(x => x));
+            }
+            
+            // Se non trova Positions, prova con Deals (formato alternativo)
+            if (trades.length === 0) {
+              let dealsStart = -1;
+              for (let i = 0; i < data.length; i++) {
+                if (data[i][0] === 'Deals') { dealsStart = i + 2; break; }
+              }
+              
+              if (dealsStart !== -1) {
+                for (let i = dealsStart; i < data.length; i++) {
+                  const row = data[i];
+                  let dateVal = row[0];
+                  
+                  // Gestisci sia stringhe che oggetti Date
+                  let tradeDate;
+                  if (dateVal instanceof Date) {
+                    tradeDate = dateVal;
+                  } else {
+                    const dateStr = String(dateVal || '');
+                    if (!dateStr.match(/^\d{4}[\.\-]/) && !dateStr.match(/^\d{2}[\.\-]/)) {
+                      if (row[0] && ['Orders', 'Positions', 'Working Orders'].includes(String(row[0]))) break;
+                      continue;
+                    }
+                    tradeDate = new Date(dateStr.replace(/\./g, '-'));
+                  }
+                  
+                  if (!tradeDate || isNaN(tradeDate.getTime())) continue;
+                  
+                  try {
+                    const profit = parseFloat(row[11]) || 0;
+                    const type = String(row[3] || '').toLowerCase();
+                    const direction = String(row[4] || '').toLowerCase();
+                    const symbol = String(row[2] || '');
+                    
+                    // Solo trade chiusi (direction = 'out')
+                    if (symbol && (type === 'buy' || type === 'sell') && direction === 'out') {
+                      trades.push({
+                        date: tradeDate,
+                        profit: profit,
+                        symbol: symbol,
+                        volume: parseFloat(row[5]) || 0
+                      });
+                      
+                      if (profit > 0) {
+                        grossProfit += profit;
+                        wins++;
+                      } else if (profit < 0) {
+                        grossLoss += profit;
+                        losses++;
+                      }
+                    }
+                  } catch (e) {
+                    console.error('Errore deals:', e);
+                  }
+                }
+              }
+            }
+            
+            // Calcola valore iniziale/finale da Deals (balance)
             let dealsStart = -1;
             for (let i = 0; i < data.length; i++) {
               if (data[i][0] === 'Deals') { dealsStart = i + 2; break; }
             }
             
-            if (dealsStart === -1) {
-              reject(new Error('Sezione Deals non trovata'));
-              return;
-            }
-            
-            // Processa deals
-            const trades = [];
-            let grossProfit = 0, grossLoss = 0, wins = 0, losses = 0;
-            let valoreIniziale = 0, valoreFinale = 0;
-            let minDate = null, maxDate = null;
-            let balanceHistory = [];
-            
-            for (let i = dealsStart; i < data.length; i++) {
-              const row = data[i];
-              const dateStr = String(row[0] || '');
-              
-              // Stop se nuova sezione
-              if (!dateStr.match(/^\d{4}\.\d{2}\.\d{2}/) && row[0]) {
-                if (['Orders', 'Positions', 'Working Orders'].includes(row[0])) break;
-              }
-              
-              if (!dateStr.match(/^\d{4}\.\d{2}\.\d{2}/)) continue;
-              
-              try {
-                const profit = parseFloat(row[12]) || 0;
-                const type = String(row[3] || '').toLowerCase();
-                const entry = String(row[6] || '').toLowerCase();
-                const balance = parseFloat(row[13]) || 0;
-                
-                const tradeDate = new Date(dateStr.replace(/\./g, '-'));
-                if (!minDate || tradeDate < minDate) minDate = tradeDate;
-                if (!maxDate || tradeDate > maxDate) maxDate = tradeDate;
-                
-                // Traccia balance
+            if (dealsStart !== -1) {
+              let firstBalance = null, lastBalance = null;
+              for (let i = dealsStart; i < data.length; i++) {
+                const row = data[i];
+                const balance = parseFloat(row[12]) || 0;
                 if (balance > 0) {
-                  balanceHistory.push({ date: tradeDate, balance, type, entry, profit });
+                  if (firstBalance === null) firstBalance = balance;
+                  lastBalance = balance;
                 }
-                
-                // Solo trade chiusi (non deposit/withdrawal)
-                if ((type === 'buy' || type === 'sell') && (entry === 'out' || entry === 'in/out')) {
-                  trades.push({
-                    date: tradeDate,
-                    profit: profit,
-                    symbol: row[4] || '',
-                    volume: parseFloat(row[5]) || 0
-                  });
-                  
-                  if (profit > 0) {
-                    grossProfit += profit;
-                    wins++;
-                  } else if (profit < 0) {
-                    grossLoss += profit;
-                    losses++;
-                  }
-                }
-              } catch (e) {
-                console.error('Errore riga:', e);
               }
+              valoreIniziale = firstBalance || 0;
+              valoreFinale = lastBalance || 0;
             }
             
-            // Calcola valore iniziale e finale
-            if (balanceHistory.length > 0) {
-              // Ordina per data
-              balanceHistory.sort((a, b) => a.date - b.date);
-              
-              // Trova primo balance dopo depositi iniziali
-              for (let i = 0; i < balanceHistory.length; i++) {
-                const entry = balanceHistory[i];
-                if (entry.type === 'balance' || entry.type === 'deposit' || entry.type === 'credit') {
-                  valoreIniziale = entry.balance;
-                } else {
-                  break;
-                }
-              }
-              
-              // Ultimo balance
-              valoreFinale = balanceHistory[balanceHistory.length - 1].balance;
-            }
+            console.log('MT5 Parsed:', { accountNumber, currency, trades: trades.length, grossProfit, grossLoss });
             
             resolve({
               accountName,
@@ -2447,12 +2515,13 @@
               losses,
               valoreIniziale,
               valoreFinale,
-              minDate,
-              maxDate,
+              minDate: trades.length > 0 ? trades[0].date : null,
+              maxDate: trades.length > 0 ? trades[trades.length - 1].date : null,
               fileName: file.name
             });
             
           } catch (e) {
+            console.error('Errore parsing:', e);
             reject(e);
           }
         };
