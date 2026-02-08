@@ -49,6 +49,7 @@ export default async function handler(req, res) {
 
       return res.status(200).json({
         product: data.product,
+        platform: data.platform || 'MT5',
         license_type: data.license_type,
         trial_days: data.trial_days
       });
@@ -135,7 +136,8 @@ export default async function handler(req, res) {
         success: true,
         account_number: account_number,
         expires_at: expiresAt,
-        product: codeData.product
+        product: codeData.product,
+        platform: codeData.platform || 'MT5'
       });
 
     } catch (err) {

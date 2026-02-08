@@ -315,7 +315,7 @@ export default async function handler(req, res) {
 
       // POST - Create new code
       if (req.method === 'POST') {
-        const { product, license_type, trial_days } = req.body;
+        const { product, platform, license_type, trial_days } = req.body;
 
         if (!product || !license_type) {
           return res.status(400).json({ error: 'Missing required fields' });
@@ -331,6 +331,7 @@ export default async function handler(req, res) {
         const codeData = {
           code: code,
           product: product,
+          platform: platform || 'MT5',
           license_type: license_type,
           trial_days: license_type === 'trial' ? (trial_days || 7) : null,
           used: false

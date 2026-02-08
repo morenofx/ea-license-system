@@ -668,6 +668,13 @@
               </select>
             </div>
             <div class="form-group">
+              <label>Piattaforma</label>
+              <select id="codePlatform">
+                <option value="MT5">MT5</option>
+                <option value="MT4">MT4</option>
+              </select>
+            </div>
+            <div class="form-group">
               <label>Tipo Licenza</label>
               <select id="codeType" onchange="toggleCodeTrialDays()">
                 <option value="trial">⏱️ Trial</option>
@@ -695,6 +702,7 @@
                 <tr>
                   <th>Codice</th>
                   <th>Prodotto</th>
+                  <th>Platform</th>
                   <th>Tipo</th>
                   <th>Giorni</th>
                   <th>Stato</th>
@@ -703,7 +711,7 @@
                 </tr>
               </thead>
               <tbody id="codesTable">
-                <tr><td colspan="7" style="text-align:center;color:rgba(255,255,255,0.4);">Caricamento...</td></tr>
+                <tr><td colspan="8" style="text-align:center;color:rgba(255,255,255,0.4);">Caricamento...</td></tr>
               </tbody>
             </table>
           </div>
@@ -1562,7 +1570,7 @@
       const tbody = $('codesTable');
       
       if (codes.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:rgba(255,255,255,0.4);">Nessun codice creato</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:rgba(255,255,255,0.4);">Nessun codice creato</td></tr>';
         updateCodeStats();
         return;
       }
@@ -1574,12 +1582,14 @@
         const typeClass = 'type-' + c.license_type;
         const statusLabel = c.used ? '<span style="color:#6b7280;">✓ Usato</span>' : '<span style="color:#22c55e;">✅ Disponibile</span>';
         const days = c.trial_days || '-';
+        const platform = c.platform || 'MT5';
         const link = `${baseUrl}/activate.html?code=${c.code}`;
         
         return `
         <tr>
           <td class="mono" style="font-weight:600;color:#00FF41;">${c.code}</td>
           <td>${c.product.replace('_', ' ')}</td>
+          <td><span class="source-badge" style="background:rgba(59,130,246,0.15);color:#3b82f6;">${platform}</span></td>
           <td><span class="source-badge ${typeClass}">${typeLabel}</span></td>
           <td>${days}</td>
           <td>${statusLabel}</td>
@@ -1621,6 +1631,7 @@
     async function createCode() {
       const codeData = {
         product: $('codeProduct').value,
+        platform: $('codePlatform').value,
         license_type: $('codeType').value,
         trial_days: parseInt($('codeTrialDays').value) || 30
       };

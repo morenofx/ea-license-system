@@ -62,7 +62,7 @@
     /* License Info */
     .license-info {
       display: grid;
-      grid-template-columns: 1fr 1fr;
+      grid-template-columns: 1fr 1fr 1fr;
       gap: 16px;
       margin-bottom: 20px;
     }
@@ -317,11 +317,15 @@
             <div class="info-value" id="infoProduct">XAU AutoTrader</div>
           </div>
           <div class="info-item">
+            <div class="info-label">Platform</div>
+            <div class="info-value" id="infoPlatform" style="color:#3b82f6;">MT5</div>
+          </div>
+          <div class="info-item">
             <div class="info-label">License Type</div>
             <div class="info-value" id="infoType">Trial</div>
           </div>
         </div>
-        <div id="trialInfo" style="text-align:center;color:#f59e0b;font-size:14px;display:none;">
+        <div id="trialInfo" style="text-align:center;color:#f59e0b;font-size:14px;margin-top:12px;display:none;">
           ⏱️ Valid for <strong id="infoDays">30</strong> days after activation
         </div>
       </div>
@@ -367,8 +371,7 @@
       
       <div class="download-section">
         <div class="card-title">📥 Download EA</div>
-        <a href="#" id="downloadMT5" class="btn btn-download">⬇️ Download for MT5</a>
-        <a href="#" id="downloadMT4" class="btn btn-download">⬇️ Download for MT4</a>
+        <a href="#" id="downloadEA" class="btn btn-download">⬇️ Download EA</a>
         
         <div class="instructions">
           <h3>📖 Installation Instructions</h3>
@@ -441,6 +444,7 @@
       // Fill info
       const product = codeData.product.replace('_', ' ');
       document.getElementById('infoProduct').textContent = product;
+      document.getElementById('infoPlatform').textContent = codeData.platform || 'MT5';
       
       const typeEl = document.getElementById('infoType');
       if (codeData.license_type === 'trial') {
@@ -527,17 +531,22 @@
         document.getElementById('successExpires').textContent = 'Lifetime';
       }
       
-      // Set download links
+      // Set download link
       const baseUrl = window.location.origin;
       const product = codeData.product;
+      const platform = data.platform || codeData.platform || 'MT5';
+      const ext = platform === 'MT4' ? 'ex4' : 'ex5';
       
+      let filename = '';
       if (product.includes('XAU')) {
-        document.getElementById('downloadMT5').href = `${baseUrl}/downloads/XAU_AutoTrader_Online_MT5.ex5`;
-        document.getElementById('downloadMT4').href = `${baseUrl}/downloads/XAU_AutoTrader_Online_MT4.ex4`;
+        filename = `XAU_AutoTrader_Online_${platform}.${ext}`;
       } else {
-        document.getElementById('downloadMT5').href = `${baseUrl}/downloads/BTC_AutoTrader_Online_MT5.ex5`;
-        document.getElementById('downloadMT4').href = `${baseUrl}/downloads/BTC_AutoTrader_Online_MT4.ex4`;
+        filename = `BTC_AutoTrader_Online_${platform}.${ext}`;
       }
+      
+      const downloadBtn = document.getElementById('downloadEA');
+      downloadBtn.href = `${baseUrl}/downloads/${filename}`;
+      downloadBtn.textContent = `⬇️ Download for ${platform}`;
     }
     
     // Init
