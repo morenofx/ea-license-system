@@ -2758,10 +2758,10 @@
             <td>${acc.accountNumber}</td>
             <td>${acc.company}</td>
             <td>${acc.currency}</td>
-            <td style="text-align:right;">€${acc.grossProfitEUR.toFixed(2)}</td>
-            <td style="text-align:right;">€${Math.abs(acc.grossLossEUR).toFixed(2)}</td>
-            <td style="text-align:right;font-weight:bold;color:${acc.netProfitEUR >= 0 ? '#22c55e' : '#ef4444'};">€${acc.netProfitEUR.toFixed(2)}</td>
-            <td style="text-align:right;color:#ef4444;">€${impAcc.toFixed(2)}</td>
+            <td style="text-align:right;">€ ${acc.grossProfitEUR.toFixed(2)}</td>
+            <td style="text-align:right;">€ ${Math.abs(acc.grossLossEUR).toFixed(2)}</td>
+            <td style="text-align:right;font-weight:bold;color:${acc.netProfitEUR >= 0 ? '#22c55e' : '#ef4444'};">€ ${acc.netProfitEUR.toFixed(2)}</td>
+            <td style="text-align:right;color:#ef4444;">€ ${impAcc.toFixed(2)}</td>
           </tr>
         `;
       });
@@ -2806,14 +2806,14 @@
           
           <div class="section">
             <h2>📋 Riepilogo Operazioni</h2>
-            <div class="row"><span>Totale Corrispettivi (RT21)</span><span style="font-weight:600;">€${(t.grossProfit + Math.abs(t.grossLoss)).toFixed(2)}</span></div>
-            <div class="row"><span>Totale Costi (RT22)</span><span style="font-weight:600;">€${Math.abs(t.grossLoss).toFixed(2)}</span></div>
-            <div class="row"><span>Plusvalenza Netta (RT23)</span><span style="font-weight:600;color:${t.netProfit >= 0 ? '#22c55e' : '#ef4444'};">€${t.netProfit.toFixed(2)}</span></div>
+            <div class="row"><span>Totale Corrispettivi (RT21)</span><span style="font-weight:600;">€ ${(t.grossProfit + Math.abs(t.grossLoss)).toFixed(2)}</span></div>
+            <div class="row"><span>Totale Costi (RT22)</span><span style="font-weight:600;">€ ${Math.abs(t.grossLoss).toFixed(2)}</span></div>
+            <div class="row"><span>Plusvalenza Netta (RT23)</span><span style="font-weight:600;color:${t.netProfit >= 0 ? '#22c55e' : '#ef4444'};">€ ${t.netProfit.toFixed(2)}</span></div>
           </div>
           
           <div class="highlight">
             <div class="label">IMPOSTA SOSTITUTIVA 26% (RT26)</div>
-            <div class="value">€${imposta.toFixed(2)}</div>
+            <div class="value">€ ${imposta.toFixed(2)}</div>
           </div>
           
           <div class="section">
@@ -2867,11 +2867,11 @@
               <div><strong>Paese:</strong> ${acc.countryInfo.name} (Codice: ${acc.countryInfo.code})</div>
               <div><strong>Valuta conto:</strong> ${acc.currency}</div>
               <div><strong>Giorni detenzione:</strong> ${acc.giorni}</div>
-              <div><strong>Valore Iniziale:</strong> €${acc.valoreInizialeEUR.toFixed(2)}</div>
-              <div><strong>Valore Finale:</strong> €${acc.valoreFinaleEUR.toFixed(2)}</div>
+              <div><strong>Valore Iniziale:</strong> € ${acc.valoreInizialeEUR.toFixed(2)}</div>
+              <div><strong>Valore Finale:</strong> € ${acc.valoreFinaleEUR.toFixed(2)}</div>
             </div>
             <div style="margin-top:16px;padding-top:12px;border-top:1px solid #bbf7d0;text-align:right;">
-              <span style="font-size:18px;font-weight:700;color:#ca8a04;">IVAFE: €${acc.ivafe.toFixed(2)}</span>
+              <span style="font-size:18px;font-weight:700;color:#ca8a04;">IVAFE: € ${acc.ivafe.toFixed(2)}</span>
             </div>
           </div>
         `;
@@ -2917,7 +2917,7 @@
           
           <div class="highlight">
             <div class="label">TOTALE IVAFE ${year}</div>
-            <div class="value">€${data.totals.ivafe.toFixed(2)}</div>
+            <div class="value">€ ${data.totals.ivafe.toFixed(2)}</div>
           </div>
           
           <div class="info-box">
@@ -2990,9 +2990,9 @@
       
       doc.setFontSize(11);
       doc.setTextColor(0, 0, 0);
-      doc.text(`Totale Corrispettivi (RT21): €${(t.grossProfit + Math.abs(t.grossLoss)).toFixed(2)}`, 25, 58);
-      doc.text(`Totale Costi (RT22): €${Math.abs(t.grossLoss).toFixed(2)}`, 25, 70);
-      doc.text(`Plusvalenza Netta (RT23): €${t.netProfit.toFixed(2)}`, 25, 82);
+      doc.text(`Totale Corrispettivi (RT21): € ${(t.grossProfit + Math.abs(t.grossLoss)).toFixed(2)}`, 25, 58);
+      doc.text(`Totale Costi (RT22): € ${Math.abs(t.grossLoss).toFixed(2)}`, 25, 70);
+      doc.text(`Plusvalenza Netta (RT23): € ${t.netProfit.toFixed(2)}`, 25, 82);
       
       // Box imposta
       doc.setFillColor(254, 226, 226);
@@ -3005,7 +3005,7 @@
       
       doc.setFontSize(24);
       doc.setTextColor(220, 38, 38);
-      doc.text(`€${imposta.toFixed(2)}`, 105, 122, { align: 'center' });
+      doc.text(`€ ${imposta.toFixed(2)}`, 105, 122, { align: 'center' });
       
       // Tabella account
       let y = 145;
@@ -3033,9 +3033,9 @@
         doc.text(acc.accountNumber, 18, y);
         doc.text(acc.company.substring(0, 20), 50, y);
         doc.text(acc.currency, 100, y);
-        doc.text(`€${acc.grossProfitEUR.toFixed(2)}`, 125, y);
-        doc.text(`€${acc.netProfitEUR.toFixed(2)}`, 155, y);
-        doc.text(`€${impAcc.toFixed(2)}`, 180, y);
+        doc.text(`€ ${acc.grossProfitEUR.toFixed(2)}`, 125, y);
+        doc.text(`€ ${acc.netProfitEUR.toFixed(2)}`, 155, y);
+        doc.text(`€ ${impAcc.toFixed(2)}`, 180, y);
         y += 8;
       });
       
@@ -3080,12 +3080,12 @@
         doc.text(`Paese: ${acc.countryInfo.name} (Codice: ${acc.countryInfo.code})`, 20, y + 28);
         doc.text(`Valuta: ${acc.currency} | Giorni: ${acc.giorni}`, 20, y + 36);
         
-        doc.text(`Valore Iniziale: €${acc.valoreInizialeEUR.toFixed(2)}`, 110, y + 20);
-        doc.text(`Valore Finale: €${acc.valoreFinaleEUR.toFixed(2)}`, 110, y + 28);
+        doc.text(`Valore Iniziale: € ${acc.valoreInizialeEUR.toFixed(2)}`, 110, y + 20);
+        doc.text(`Valore Finale: € ${acc.valoreFinaleEUR.toFixed(2)}`, 110, y + 28);
         
         doc.setFontSize(12);
         doc.setTextColor(202, 138, 4);
-        doc.text(`IVAFE: €${acc.ivafe.toFixed(2)}`, 110, y + 38);
+        doc.text(`IVAFE: € ${acc.ivafe.toFixed(2)}`, 110, y + 38);
         
         y += 52;
       });
@@ -3101,7 +3101,7 @@
       
       doc.setFontSize(18);
       doc.setTextColor(202, 138, 4);
-      doc.text(`€${data.totals.ivafe.toFixed(2)}`, 105, y + 20, { align: 'center' });
+      doc.text(`€ ${data.totals.ivafe.toFixed(2)}`, 105, y + 20, { align: 'center' });
       
       // Istruzioni
       y += 35;
