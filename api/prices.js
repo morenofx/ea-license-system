@@ -29,7 +29,8 @@ export default async function handler(req, res) {
       // Return defaults
       return res.status(200).json({
         price_xau: 499,
-        price_btc: 499
+        price_btc: 499,
+        price_ghb: 499
       });
     }
 
@@ -40,7 +41,8 @@ export default async function handler(req, res) {
     console.error(err);
     return res.status(200).json({
       price_xau: 499,
-      price_btc: 499
+      price_btc: 499,
+      price_ghb: 499
     });
   }
 }

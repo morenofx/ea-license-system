@@ -63,7 +63,7 @@
     /* Product Selection */
     .products {
       display: grid;
-      grid-template-columns: 1fr 1fr;
+      grid-template-columns: 1fr 1fr 1fr;
       gap: 12px;
       margin-bottom: 24px;
     }
@@ -279,6 +279,11 @@
             <div class="product-name">BTC AutoTrader</div>
             <div class="product-price" id="priceBTC">€499</div>
           </div>
+          <div class="product" data-product="Gold_Hydra_Bot" onclick="selectProduct(this)">
+            <div class="product-icon">🐉</div>
+            <div class="product-name">Gold Hydra Bot</div>
+            <div class="product-price" id="priceGHB">€499</div>
+          </div>
         </div>
       </div>
       
@@ -340,7 +345,7 @@
 
   <script>
     let selectedProduct = 'XAU_AutoTrader';
-    let prices = { XAU_AutoTrader: 499, BTC_AutoTrader: 499 };
+    let prices = { XAU_AutoTrader: 499, BTC_AutoTrader: 499, Gold_Hydra_Bot: 499 };
     
     // Load prices from server
     async function loadPrices() {
@@ -350,8 +355,10 @@
           const data = await res.json();
           prices.XAU_AutoTrader = data.price_xau || 499;
           prices.BTC_AutoTrader = data.price_btc || 499;
+          prices.Gold_Hydra_Bot = data.price_ghb || 499;
           document.getElementById('priceXAU').textContent = '€' + prices.XAU_AutoTrader;
           document.getElementById('priceBTC').textContent = '€' + prices.BTC_AutoTrader;
+          document.getElementById('priceGHB').textContent = '€' + prices.Gold_Hydra_Bot;
         }
       } catch (err) {
         console.log('Using default prices');

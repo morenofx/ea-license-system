@@ -55,7 +55,7 @@ CREATE TABLE IF NOT EXISTS settings (
 );
 
 -- Inserisci prezzi di default
-INSERT INTO settings (key, value) VALUES ('prices', '{"price_xau": 499, "price_btc": 499}')
+INSERT INTO settings (key, value) VALUES ('prices', '{"price_xau": 499, "price_btc": 499, "price_ghb": 499}')
 ON CONFLICT (key) DO NOTHING;
 
 -- ============================================

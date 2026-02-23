@@ -523,12 +523,15 @@
             </div>
             <div class="form-group">
               <label>Prodotto</label>
-              <select id="saleProduct">
+              <select id="saleProduct" onchange="toggleCustomProduct('saleProduct','saleCustomProduct')">
                 <option value="XAU_AutoTrader">XAU AutoTrader (EA)</option>
                 <option value="BTC_AutoTrader">BTC AutoTrader (EA)</option>
+                <option value="Gold_Hydra_Bot">Gold Hydra Bot (EA)</option>
                 <option value="XAU_Signal">XAU Signal</option>
                 <option value="BTC_Signal">BTC Signal</option>
+                <option value="__custom__">✏️ Altro (Custom)...</option>
               </select>
+              <input type="text" id="saleCustomProduct" placeholder="Nome prodotto custom..." style="display:none;margin-top:8px;">
             </div>
             <div class="form-group">
               <label>Fonte</label>
@@ -625,6 +628,10 @@
             <div class="stat-label">BTC_AutoTrader</div>
           </div>
           <div class="stat-card">
+            <div class="stat-number" style="color:#ff6b35;" id="statGHB">0</div>
+            <div class="stat-label">Gold_Hydra_Bot</div>
+          </div>
+          <div class="stat-card">
             <div class="stat-number" style="color:#ffd700;" id="statPaid">0</div>
             <div class="stat-label">💰 Paid</div>
           </div>
@@ -654,12 +661,15 @@
             </div>
             <div class="form-group">
               <label>Prodotto EA</label>
-              <select id="licProduct">
+              <select id="licProduct" onchange="toggleCustomProduct('licProduct','licCustomProduct')">
                 <option value="XAU_AutoTrader">XAU AutoTrader (EA)</option>
                 <option value="BTC_AutoTrader">BTC AutoTrader (EA)</option>
+                <option value="Gold_Hydra_Bot">Gold Hydra Bot (EA)</option>
                 <option value="XAU_Signal">XAU Signal</option>
                 <option value="BTC_Signal">BTC Signal</option>
+                <option value="__custom__">✏️ Altro (Custom)...</option>
               </select>
+              <input type="text" id="licCustomProduct" placeholder="Nome prodotto custom..." style="display:none;margin-top:8px;">
             </div>
             <div class="form-group">
               <label>Tipo Licenza</label>
@@ -730,10 +740,13 @@
           <div class="form-row">
             <div class="form-group">
               <label>Prodotto</label>
-              <select id="codeProduct">
+              <select id="codeProduct" onchange="toggleCustomProduct('codeProduct','codeCustomProduct')">
                 <option value="XAU_AutoTrader">XAU AutoTrader</option>
                 <option value="BTC_AutoTrader">BTC AutoTrader</option>
+                <option value="Gold_Hydra_Bot">Gold Hydra Bot</option>
+                <option value="__custom__">✏️ Altro (Custom)...</option>
               </select>
+              <input type="text" id="codeCustomProduct" placeholder="Nome prodotto custom..." style="display:none;margin-top:8px;">
             </div>
             <div class="form-group">
               <label>Piattaforma</label>
@@ -1000,6 +1013,10 @@
               <label>BTC AutoTrader (EUR)</label>
               <input type="number" id="priceBTC" value="499" step="1">
             </div>
+            <div class="form-group">
+              <label>Gold Hydra Bot (EUR)</label>
+              <input type="number" id="priceGHB" value="499" step="1">
+            </div>
           </div>
           <button class="btn btn-primary" onclick="saveSettings()">💾 Salva Prezzi</button>
         </div>
@@ -1078,6 +1095,32 @@
       $('mainPanel').classList.remove('active');
       $('loginPanel').classList.add('active');
       $('password').value = '';
+    }
+    
+    // ==================== CUSTOM PRODUCT HELPERS ====================
+    function toggleCustomProduct(selectId, inputId) {
+      const select = $(selectId);
+      const input = $(inputId);
+      if (select.value === '__custom__') {
+        input.style.display = 'block';
+        input.focus();
+      } else {
+        input.style.display = 'none';
+        input.value = '';
+      }
+    }
+    
+    function getProductValue(selectId, inputId) {
+      const select = $(selectId);
+      if (select.value === '__custom__') {
+        const custom = $(inputId).value.trim().replace(/\s+/g, '_');
+        if (!custom) {
+          showStatus('Inserisci il nome del prodotto custom', true);
+          return null;
+        }
+        return custom;
+      }
+      return select.value;
     }
     
     // ==================== TABS ====================
@@ -1217,10 +1260,12 @@
     
     async function saveSale() {
       const source = $('saleSource').value;
+      const product = getProductValue('saleProduct', 'saleCustomProduct');
+      if (!product) return;
       
       const saleData = {
         sale_date: $('saleDate').value,
-        ea_product: $('saleProduct').value,
+        ea_product: product,
         source: source,
         amount_usd: $('saleAmountUSD').value,
         exchange_rate: $('saleExchangeRate').value,
@@ -1377,6 +1422,7 @@
     function updateLicenseStats() {
       const xau = licenses.filter(l => l.ea_product === 'XAU_AutoTrader');
       const btc = licenses.filter(l => l.ea_product === 'BTC_AutoTrader');
+      const ghb = licenses.filter(l => l.ea_product === 'Gold_Hydra_Bot');
       const paid = licenses.filter(l => (l.license_type || 'paid') === 'paid');
       const free = licenses.filter(l => l.license_type === 'free');
       const trial = licenses.filter(l => l.license_type === 'trial');
@@ -1384,6 +1430,7 @@
       $('statTotaleLicenses').textContent = licenses.length;
       $('statXAU').textContent = xau.length;
       $('statBTC').textContent = btc.length;
+      $('statGHB').textContent = ghb.length;
       $('statPaid').textContent = paid.length;
       $('statFreeLic').textContent = free.length;
       $('statTrial').textContent = trial.length;
@@ -1408,10 +1455,13 @@
     
     async function saveLicense() {
       const licenseType = $('licType').value;
+      const product = getProductValue('licProduct', 'licCustomProduct');
+      if (!product) return;
+      
       const licenseData = {
         account_number: $('licAccountNumber').value.trim(),
         client_name: $('licClientName').value.trim(),
-        ea_product: $('licProduct').value,
+        ea_product: product,
         license_type: licenseType
       };
       
@@ -1995,8 +2045,11 @@
     }
     
     async function createCode() {
+      const product = getProductValue('codeProduct', 'codeCustomProduct');
+      if (!product) return;
+      
       const codeData = {
-        product: $('codeProduct').value,
+        product: product,
         platform: $('codePlatform').value,
         license_type: $('codeType').value,
         trial_days: parseInt($('codeTrialDays').value) || 30
@@ -2059,6 +2112,7 @@
           if (data.settings) {
             $('priceXAU').value = data.settings.price_xau || 499;
             $('priceBTC').value = data.settings.price_btc || 499;
+            $('priceGHB').value = data.settings.price_ghb || 499;
           }
         }
       } catch (err) {
@@ -2073,7 +2127,8 @@
     async function saveSettings() {
       const settings = {
         price_xau: parseInt($('priceXAU').value) || 499,
-        price_btc: parseInt($('priceBTC').value) || 499
+        price_btc: parseInt($('priceBTC').value) || 499,
+        price_ghb: parseInt($('priceGHB').value) || 499
       };
       
       try {
@@ -2125,7 +2180,9 @@
             let ea_product = 'BTC_AutoTrader';
             const nome = v.nomeEA.toLowerCase();
             
-            if (nome.includes('signal') || nome.includes('subscription')) {
+            if (nome.includes('hydra')) {
+              ea_product = 'Gold_Hydra_Bot';
+            } else if (nome.includes('signal') || nome.includes('subscription')) {
               if (nome.includes('xau')) {
                 ea_product = 'XAU_Signal';
               } else {

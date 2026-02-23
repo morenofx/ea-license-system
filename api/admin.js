@@ -275,7 +275,7 @@ export default async function handler(req, res) {
           .single();
 
         if (error || !data) {
-          return res.status(200).json({ settings: { price_xau: 499, price_btc: 499 } });
+          return res.status(200).json({ settings: { price_xau: 499, price_btc: 499, price_ghb: 499 } });
         }
 
         return res.status(200).json({ settings: JSON.parse(data.value) });
@@ -283,11 +283,12 @@ export default async function handler(req, res) {
 
       // POST - Save settings
       if (req.method === 'POST') {
-        const { price_xau, price_btc } = req.body;
+        const { price_xau, price_btc, price_ghb } = req.body;
 
         const value = JSON.stringify({
           price_xau: price_xau || 499,
-          price_btc: price_btc || 499
+          price_btc: price_btc || 499,
+          price_ghb: price_ghb || 499
         });
 
         // Upsert settings
