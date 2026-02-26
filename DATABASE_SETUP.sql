@@ -32,6 +32,25 @@ CREATE INDEX IF NOT EXISTS idx_sales_year ON sales(EXTRACT(YEAR FROM sale_date))
 -- ALTER TABLE licenses ADD COLUMN license_type VARCHAR(20) DEFAULT 'paid';
 -- ALTER TABLE licenses ADD COLUMN expires_at TIMESTAMP DEFAULT NULL;
 
+-- Tabella ETSY_SALES (vendite Etsy / Printify)
+CREATE TABLE IF NOT EXISTS etsy_sales (
+  id SERIAL PRIMARY KEY,
+  sale_date DATE NOT NULL,
+  product_name VARCHAR(200) NOT NULL,
+  quantity INTEGER DEFAULT 1,
+  sale_price_eur DECIMAL(10,2) NOT NULL,
+  etsy_fees_eur DECIMAL(10,2) DEFAULT 0,
+  printify_cost_usd DECIMAL(10,2) DEFAULT 0,
+  exchange_rate DECIMAL(10,6) DEFAULT 1,
+  margin_eur DECIMAL(10,2) DEFAULT 0,
+  client_name VARCHAR(100),
+  notes TEXT,
+  created_at TIMESTAMP DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_etsy_sales_date ON etsy_sales(sale_date);
+CREATE INDEX IF NOT EXISTS idx_etsy_sales_year ON etsy_sales(EXTRACT(YEAR FROM sale_date));
+
 -- Tabella ACTIVATION_CODES (per link attivazione usa-e-getta)
 CREATE TABLE IF NOT EXISTS activation_codes (
   id SERIAL PRIMARY KEY,

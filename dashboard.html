@@ -417,6 +417,42 @@
       border: 1px solid rgba(0, 168, 255, 0.3);
       color: #00a8ff;
     }
+
+    /* Etsy styles */
+    .source-etsy { background: rgba(245, 131, 31, 0.15); color: #f5831f; }
+    .product-tshirt { background: rgba(245, 131, 31, 0.15); color: #f5831f; }
+    .profit-positive { color: #22c55e; }
+    .profit-negative { color: #ef4444; }
+    
+    /* Progress bar */
+    .progress-container {
+      background: rgba(255,255,255,0.06);
+      border-radius: 12px;
+      overflow: hidden;
+      height: 32px;
+      position: relative;
+      margin: 12px 0;
+    }
+    .progress-bar {
+      height: 100%;
+      border-radius: 12px;
+      transition: width 0.5s ease;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 12px;
+      font-weight: 600;
+    }
+    .progress-bar.safe { background: linear-gradient(90deg, #22c55e, #16a34a); }
+    .progress-bar.warning { background: linear-gradient(90deg, #f59e0b, #d97706); }
+    .progress-bar.danger { background: linear-gradient(90deg, #ef4444, #dc2626); }
+    .progress-marker {
+      position: absolute;
+      top: -20px;
+      font-size: 11px;
+      color: rgba(255,255,255,0.6);
+      transform: translateX(-50%);
+    }
   </style>
 </head>
 <body>
@@ -445,12 +481,13 @@
       <div class="header">
         <div class="badge">🤖 SMART TRADING BOTS</div>
         <h1>EA Business Dashboard</h1>
-        <p class="subtitle">Vendite • Licenze • Tasse</p>
+        <p class="subtitle">Vendite EA • Etsy • Licenze • Tasse</p>
       </div>
       
       <!-- Tabs -->
       <div class="tabs">
         <div class="tab active" data-tab="vendite">📊 Vendite</div>
+        <div class="tab" data-tab="etsy">🛍️ Etsy</div>
         <div class="tab" data-tab="licenze">🔑 Licenze</div>
         <div class="tab" data-tab="codici">🎟️ Codici</div>
         <div class="tab" data-tab="tasse">💰 Tasse</div>
@@ -604,6 +641,128 @@
               </thead>
               <tbody id="salesTable">
                 <tr><td colspan="8" style="text-align:center;color:rgba(255,255,255,0.4);">Caricamento...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- ==================== ETSY TAB ==================== -->
+      <div id="tab-etsy" class="panel">
+        
+        <!-- Stats -->
+        <div class="stats-grid">
+          <div class="stat-card">
+            <div class="stat-number orange" id="statEtsyTotale">0</div>
+            <div class="stat-label">Vendite Totali</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-number green" id="statEtsyRicavo">€0</div>
+            <div class="stat-label">Ricavo Totale</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-number red" id="statEtsyCosti">€0</div>
+            <div class="stat-label">Costi Totali</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-number" style="color:#00FF41;" id="statEtsyMargine">€0</div>
+            <div class="stat-label">💰 Margine Netto</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-number" style="color:#f5831f;" id="statEtsyMarginePct">0%</div>
+            <div class="stat-label">% Margine</div>
+          </div>
+        </div>
+        
+        <!-- Year Filter -->
+        <div class="year-selector">
+          <label>Anno:</label>
+          <select id="etsyYear" onchange="loadEtsySales()">
+            <option value="2025">2025</option>
+            <option value="2026" selected>2026</option>
+            <option value="2027">2027</option>
+            <option value="2028">2028</option>
+            <option value="2029">2029</option>
+            <option value="2030">2030</option>
+          </select>
+          <button class="btn btn-secondary" onclick="toggleEtsyForm()">+ Aggiungi Vendita Etsy</button>
+        </div>
+        
+        <!-- Add Etsy Sale Form -->
+        <div id="etsyForm" class="card" style="display:none;">
+          <div class="card-title">🛍️ Nuova Vendita Etsy</div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Data Ordine</label>
+              <input type="date" id="etsyDate" onchange="fetchEtsyExchangeRate()">
+            </div>
+            <div class="form-group">
+              <label>Nome Prodotto</label>
+              <input type="text" id="etsyProductName" placeholder="Es: Amor Fati T-Shirt">
+            </div>
+            <div class="form-group">
+              <label>Quantità</label>
+              <input type="number" id="etsyQuantity" value="1" min="1" step="1">
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Prezzo Vendita (EUR) <span style="font-size:11px;color:rgba(255,255,255,0.4);">ciò che paga il cliente</span></label>
+              <input type="number" id="etsySalePrice" placeholder="27.79" step="0.01" oninput="updateEtsyPreview()">
+            </div>
+            <div class="form-group">
+              <label>Commissioni Etsy (EUR) <button class="btn btn-secondary" style="padding:2px 8px;font-size:10px;" onclick="autoCalcEtsyFees()">Auto ~15%</button></label>
+              <input type="number" id="etsyFees" placeholder="4.17" step="0.01" oninput="updateEtsyPreview()">
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Costi Printify (USD) <span style="font-size:11px;color:rgba(255,255,255,0.4);">produzione+spedizione+tax</span></label>
+              <input type="number" id="etsyPrintifyCost" placeholder="17.10" step="0.01" oninput="updateEtsyPreview()">
+            </div>
+            <div class="form-group">
+              <label>Cambio EUR/USD <button class="btn btn-secondary" style="padding:2px 8px;font-size:10px;" onclick="fetchEtsyExchangeRate()">🔄</button></label>
+              <input type="number" id="etsyExchangeRate" placeholder="1.0850" step="0.0001" oninput="updateEtsyPreview()">
+            </div>
+            <div class="form-group">
+              <label>Margine Netto EUR</label>
+              <input type="text" id="etsyPreviewMargin" readonly style="background:rgba(34,197,94,0.1);color:#22c55e;font-weight:600;">
+            </div>
+          </div>
+          <div class="form-group">
+            <label>Cliente</label>
+            <input type="text" id="etsyClientName" placeholder="Es: Paul Sparrow-Clarke">
+          </div>
+          <div class="form-group">
+            <label>Note (opzionale)</label>
+            <input type="text" id="etsyNotes" placeholder="Es: Gildan 5000, Dark Chocolate, L">
+          </div>
+          <div class="btn-group" style="margin-top:16px;">
+            <button class="btn btn-primary" onclick="saveEtsySale()">💾 Salva Vendita Etsy</button>
+            <button class="btn btn-secondary" onclick="toggleEtsyForm()">Annulla</button>
+          </div>
+        </div>
+        
+        <!-- Etsy Sales Table -->
+        <div class="card">
+          <div class="card-title">📋 Storico Vendite Etsy / Printify</div>
+          <div class="table-container">
+            <table>
+              <thead>
+                <tr>
+                  <th>Data</th>
+                  <th>Prodotto</th>
+                  <th>Qty</th>
+                  <th class="text-right">Vendita €</th>
+                  <th class="text-right">Comm. Etsy €</th>
+                  <th class="text-right">Printify $</th>
+                  <th class="text-right">Printify €</th>
+                  <th class="text-right">Margine €</th>
+                  <th>Azioni</th>
+                </tr>
+              </thead>
+              <tbody id="etsyTable">
+                <tr><td colspan="9" style="text-align:center;color:rgba(255,255,255,0.4);">Nessuna vendita Etsy</td></tr>
               </tbody>
             </table>
           </div>
@@ -818,14 +977,44 @@
           </select>
         </div>
         
+        <!-- Soglia P.IVA / INPS -->
+        <div class="card" style="background:linear-gradient(135deg, rgba(0,255,136,0.05), rgba(245,131,31,0.05));">
+          <div class="card-title">🎯 Soglia €5.000 — Obbligo INPS / Valutazione P.IVA</div>
+          <div class="stats-grid">
+            <div class="stat-card">
+              <div class="stat-number" style="color:#a855f7;" id="taxMQL5Net">€0</div>
+              <div class="stat-label">📊 MQL5 Netto</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-number" style="color:#f5831f;" id="taxEtsyNet">€0</div>
+              <div class="stat-label">🛍️ Etsy Margine</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-number" style="color:#00FF41;" id="taxCombinatoNet">€0</div>
+              <div class="stat-label">💰 Totale Combinato</div>
+            </div>
+          </div>
+          <div style="margin-top:16px;">
+            <div style="display:flex;justify-content:space-between;font-size:12px;color:rgba(255,255,255,0.5);margin-bottom:4px;">
+              <span>€0</span>
+              <span id="taxProgressLabel">€0 / €5.000</span>
+              <span>€5.000</span>
+            </div>
+            <div class="progress-container">
+              <div class="progress-bar safe" id="taxProgressBar" style="width:0%;">0%</div>
+            </div>
+            <p id="taxProgressNote" style="font-size:12px;color:rgba(255,255,255,0.5);margin-top:8px;text-align:center;"></p>
+          </div>
+        </div>
+        
         <div class="stats-grid">
           <div class="stat-card">
             <div class="stat-number green" id="taxLordoEUR">€0</div>
-            <div class="stat-label">Lordo EUR (da dichiarare)</div>
+            <div class="stat-label">Lordo EUR MQL5 (da dichiarare)</div>
           </div>
           <div class="stat-card">
             <div class="stat-number orange" id="taxNettoEUR">€0</div>
-            <div class="stat-label">Netto EUR (incassato)</div>
+            <div class="stat-label">Netto EUR MQL5 (incassato)</div>
           </div>
           <div class="stat-card">
             <div class="stat-number red" id="taxTotale">€0</div>
@@ -1055,6 +1244,7 @@
     let adminPassword = '';
     let sales = [];
     let licenses = [];
+    let etsySales = [];
     let altriRedditiValue = 0;
     
     const $ = id => document.getElementById(id);
@@ -1137,6 +1327,7 @@
         
         // Refresh dati quando cambi tab
         if (tab.dataset.tab === 'vendite') loadSales();
+        if (tab.dataset.tab === 'etsy') loadEtsySales();
         if (tab.dataset.tab === 'licenze') loadLicenses();
         if (tab.dataset.tab === 'codici') loadCodes();
         if (tab.dataset.tab === 'tasse') loadTaxData();
@@ -1529,19 +1720,204 @@
       }
     }
     
+    // ==================== ETSY SALES ====================
+    async function loadEtsySales() {
+      const year = $('etsyYear').value;
+      try {
+        const res = await fetch(`/api/admin?type=etsy&year=${year}`, {
+          headers: { 'Authorization': `Bearer ${adminPassword}` }
+        });
+        if (!res.ok) throw new Error('Failed');
+        const data = await res.json();
+        etsySales = data.sales || [];
+        renderEtsySales();
+      } catch (err) {
+        showStatus('Errore caricamento vendite Etsy', true);
+      }
+    }
+    
+    function renderEtsySales() {
+      const tbody = $('etsyTable');
+      if (etsySales.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;color:rgba(255,255,255,0.4);">Nessuna vendita Etsy per questo anno</td></tr>';
+        updateEtsyStats();
+        return;
+      }
+      
+      tbody.innerHTML = etsySales.map(s => {
+        const printifyEUR = s.printify_cost_usd / s.exchange_rate;
+        const margin = s.sale_price_eur - s.etsy_fees_eur - printifyEUR;
+        const marginClass = margin >= 0 ? 'profit-positive' : 'profit-negative';
+        return `
+        <tr>
+          <td>${formatDate(s.sale_date)}</td>
+          <td><span class="source-badge product-tshirt">${s.product_name}</span></td>
+          <td class="text-right">${s.quantity}</td>
+          <td class="text-right mono">€${s.sale_price_eur.toFixed(2)}</td>
+          <td class="text-right mono" style="color:#ef4444;">€${s.etsy_fees_eur.toFixed(2)}</td>
+          <td class="text-right mono">$${s.printify_cost_usd.toFixed(2)}</td>
+          <td class="text-right mono">€${printifyEUR.toFixed(2)}</td>
+          <td class="text-right mono ${marginClass}">€${margin.toFixed(2)}</td>
+          <td><button class="btn btn-danger" onclick="deleteEtsySale(${s.id})">🗑️</button></td>
+        </tr>`;
+      }).join('');
+      
+      updateEtsyStats();
+    }
+    
+    function updateEtsyStats() {
+      const totalSales = etsySales.length;
+      const totalRicavo = etsySales.reduce((sum, s) => sum + s.sale_price_eur, 0);
+      const totalFees = etsySales.reduce((sum, s) => sum + s.etsy_fees_eur, 0);
+      const totalPrintify = etsySales.reduce((sum, s) => sum + (s.printify_cost_usd / s.exchange_rate), 0);
+      const totalCosti = totalFees + totalPrintify;
+      const totalMargine = totalRicavo - totalCosti;
+      const marginePct = totalRicavo > 0 ? (totalMargine / totalRicavo * 100) : 0;
+      
+      $('statEtsyTotale').textContent = totalSales;
+      $('statEtsyRicavo').textContent = '€' + totalRicavo.toFixed(0);
+      $('statEtsyCosti').textContent = '€' + totalCosti.toFixed(0);
+      $('statEtsyMargine').textContent = '€' + totalMargine.toFixed(0);
+      $('statEtsyMarginePct').textContent = marginePct.toFixed(0) + '%';
+    }
+    
+    function toggleEtsyForm() {
+      const form = $('etsyForm');
+      form.style.display = form.style.display === 'none' ? 'block' : 'none';
+      if (form.style.display === 'block') {
+        $('etsyDate').value = new Date().toISOString().split('T')[0];
+        $('etsyProductName').value = '';
+        $('etsyQuantity').value = '1';
+        $('etsySalePrice').value = '';
+        $('etsyFees').value = '';
+        $('etsyPrintifyCost').value = '';
+        $('etsyClientName').value = '';
+        $('etsyNotes').value = '';
+        $('etsyPreviewMargin').value = '';
+        fetchEtsyExchangeRate();
+      }
+    }
+    
+    async function fetchEtsyExchangeRate() {
+      const dateField = $('etsyDate');
+      const rateField = $('etsyExchangeRate');
+      if (!dateField.value) return;
+      rateField.value = '...';
+      try {
+        const date = dateField.value;
+        const res = await fetch(`https://api.frankfurter.app/${date}?from=USD&to=EUR`);
+        const data = await res.json();
+        const rate = 1 / data.rates.EUR;
+        rateField.value = rate.toFixed(4);
+        updateEtsyPreview();
+      } catch {
+        rateField.value = '1.0850';
+        updateEtsyPreview();
+      }
+    }
+    
+    function autoCalcEtsyFees() {
+      const salePrice = parseFloat($('etsySalePrice').value) || 0;
+      $('etsyFees').value = (salePrice * 0.15).toFixed(2);
+      updateEtsyPreview();
+    }
+    
+    function updateEtsyPreview() {
+      const salePrice = parseFloat($('etsySalePrice').value) || 0;
+      const fees = parseFloat($('etsyFees').value) || 0;
+      const printifyUSD = parseFloat($('etsyPrintifyCost').value) || 0;
+      const rate = parseFloat($('etsyExchangeRate').value) || 1;
+      const printifyEUR = printifyUSD / rate;
+      const margin = salePrice - fees - printifyEUR;
+      $('etsyPreviewMargin').value = '€' + margin.toFixed(2);
+      $('etsyPreviewMargin').style.color = margin >= 0 ? '#22c55e' : '#ef4444';
+    }
+    
+    async function saveEtsySale() {
+      const saleData = {
+        sale_date: $('etsyDate').value,
+        product_name: $('etsyProductName').value.trim(),
+        quantity: parseInt($('etsyQuantity').value) || 1,
+        sale_price_eur: parseFloat($('etsySalePrice').value),
+        etsy_fees_eur: parseFloat($('etsyFees').value) || 0,
+        printify_cost_usd: parseFloat($('etsyPrintifyCost').value) || 0,
+        exchange_rate: parseFloat($('etsyExchangeRate').value) || 1,
+        client_name: $('etsyClientName').value.trim() || null,
+        notes: $('etsyNotes').value.trim() || null
+      };
+      
+      if (!saleData.sale_date || !saleData.product_name || !saleData.sale_price_eur) {
+        showStatus('Compila data, prodotto e prezzo vendita', true);
+        return;
+      }
+      
+      try {
+        const res = await fetch('/api/admin?type=etsy', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${adminPassword}`
+          },
+          body: JSON.stringify(saleData)
+        });
+        
+        if (res.ok) {
+          showStatus('✅ Vendita Etsy salvata!');
+          toggleEtsyForm();
+          loadEtsySales();
+        } else {
+          const err = await res.json();
+          showStatus('Errore: ' + (err.error || 'Sconosciuto'), true);
+        }
+      } catch (err) {
+        showStatus('Errore di rete', true);
+      }
+    }
+    
+    async function deleteEtsySale(id) {
+      if (!confirm('Eliminare questa vendita Etsy?')) return;
+      try {
+        const res = await fetch('/api/admin?type=etsy', {
+          method: 'DELETE',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${adminPassword}`
+          },
+          body: JSON.stringify({ id })
+        });
+        if (res.ok) {
+          showStatus('✅ Vendita Etsy eliminata');
+          loadEtsySales();
+        }
+      } catch (err) {
+        showStatus('Errore eliminazione', true);
+      }
+    }
+
     // ==================== TAXES ====================
     async function loadTaxData() {
       const year = $('taxYear').value;
       
       try {
+        // Load MQL5 sales
         const res = await fetch(`/api/admin?type=sales&year=${year}`, {
           headers: { 'Authorization': `Bearer ${adminPassword}` }
         });
-        
         if (!res.ok) throw new Error('Failed');
-        
         const data = await res.json();
         sales = data.sales || [];
+        
+        // Load Etsy sales
+        try {
+          const etsyRes = await fetch(`/api/admin?type=etsy&year=${year}`, {
+            headers: { 'Authorization': `Bearer ${adminPassword}` }
+          });
+          if (etsyRes.ok) {
+            const etsyData = await etsyRes.json();
+            etsySales = etsyData.sales || [];
+          }
+        } catch(e) { /* Etsy table might not exist yet */ }
+        
         calculateTaxes();
         
       } catch (err) {
@@ -1550,6 +1926,7 @@
     }
     
     function calculateTaxes() {
+      // MQL5 calculations
       const totLordoEUR = sales.reduce((sum, s) => sum + s.amount_eur_gross, 0);
       const totNettoEUR = sales.reduce((sum, s) => sum + s.amount_eur_net, 0);
       const commissioneMQL5 = totLordoEUR - totNettoEUR;
@@ -1560,9 +1937,18 @@
       // Commissioni prelievo: 1.5% sul netto + 1€ per ogni prelievo
       const commissioniPrelievo = (totNettoEUR * 0.015) + (numeroPrelievi * 1);
       
-      // Reddito imponibile = Netto - commissioni prelievo
+      // Reddito imponibile MQL5
       const redditoImponibileMQL5 = totNettoEUR - commissioniPrelievo;
-      const redditoTotale = redditoImponibileMQL5 + altriRedditiValue;
+      
+      // Etsy calculations
+      const etsyMargine = etsySales.reduce((sum, s) => {
+        const printifyEUR = s.printify_cost_usd / s.exchange_rate;
+        return sum + (s.sale_price_eur - s.etsy_fees_eur - printifyEUR);
+      }, 0);
+      
+      // Reddito combinato (MQL5 + Etsy)
+      const redditoCombinato = redditoImponibileMQL5 + Math.max(0, etsyMargine);
+      const redditoTotale = redditoCombinato + altriRedditiValue;
       
       // IRPEF progressiva italiana
       let irpefTotale = 0;
@@ -1582,31 +1968,58 @@
         irpefTotale += remaining * 0.43;
       }
       
-      // Proporzione IRPEF su MQL5
-      const proporzione = redditoTotale > 0 ? redditoImponibileMQL5 / redditoTotale : 0;
-      const irpefMQL5 = irpefTotale * proporzione;
+      // Proporzione IRPEF su attività online (MQL5 + Etsy)
+      const proporzione = redditoTotale > 0 ? redditoCombinato / redditoTotale : 0;
+      const irpefOnline = irpefTotale * proporzione;
       
-      // INPS (solo se > 5000€)
+      // INPS (solo se reddito combinato > 5000€)
       const sogliaINPS = 5000;
       const aliquotaINPS = 0.2607;
       let inps = 0;
-      if (redditoImponibileMQL5 > sogliaINPS) {
-        inps = redditoImponibileMQL5 * aliquotaINPS;
+      if (redditoCombinato > sogliaINPS) {
+        inps = redditoCombinato * aliquotaINPS;
       }
       
-      // Addizionali (stima 2%)
-      const addizionali = irpefMQL5 * 0.087;
+      // Addizionali (stima)
+      const addizionali = irpefOnline * 0.087;
       
-      const totaleImposte = irpefMQL5 + inps + addizionali;
+      const totaleImposte = irpefOnline + inps + addizionali;
+      
+      // Update progress bar
+      const progressPct = Math.min((redditoCombinato / sogliaINPS) * 100, 100);
+      const progressBar = $('taxProgressBar');
+      progressBar.style.width = progressPct + '%';
+      progressBar.textContent = progressPct.toFixed(0) + '%';
+      progressBar.className = 'progress-bar ' + (progressPct < 60 ? 'safe' : progressPct < 85 ? 'warning' : 'danger');
+      
+      $('taxProgressLabel').textContent = '€' + redditoCombinato.toFixed(0) + ' / €5.000';
+      $('taxMQL5Net').textContent = '€' + redditoImponibileMQL5.toFixed(0);
+      $('taxEtsyNet').textContent = '€' + etsyMargine.toFixed(0);
+      $('taxCombinatoNet').textContent = '€' + redditoCombinato.toFixed(0);
+      
+      if (redditoCombinato >= sogliaINPS) {
+        $('taxProgressNote').innerHTML = '⚠️ <strong>Soglia superata!</strong> Valuta apertura P.IVA forfettaria e iscrizione INPS Gestione Separata';
+        $('taxProgressNote').style.color = '#ef4444';
+      } else {
+        const mancano = sogliaINPS - redditoCombinato;
+        $('taxProgressNote').innerHTML = `✅ Sotto soglia — mancano <strong>€${mancano.toFixed(0)}</strong> per obbligo INPS`;
+        $('taxProgressNote').style.color = '#22c55e';
+      }
       
       // Update UI
       $('taxLordoEUR').textContent = '€' + totLordoEUR.toFixed(0);
       $('taxNettoEUR').textContent = '€' + totNettoEUR.toFixed(0);
       $('taxTotale').textContent = '€' + totaleImposte.toFixed(0);
       
-      const inpsNote = redditoImponibileMQL5 > sogliaINPS 
+      const inpsNote = redditoCombinato > sogliaINPS 
         ? `<span style="color:#ef4444;">⚠️ Superata soglia €5.000</span>`
         : `<span style="color:#22c55e;">Sotto soglia €5.000</span>`;
+      
+      const etsyRow = etsyMargine > 0 ? `
+        <div class="tax-row">
+          <span class="tax-label">🛍️ Margine netto Etsy</span>
+          <span class="tax-value" style="color:#f5831f;">€${etsyMargine.toFixed(2)}</span>
+        </div>` : '';
       
       $('taxBreakdown').innerHTML = `
         <div class="tax-row">
@@ -1625,6 +2038,11 @@
           <span class="tax-label">Reddito imponibile MQL5</span>
           <span class="tax-value">€${redditoImponibileMQL5.toFixed(2)}</span>
         </div>
+        ${etsyRow}
+        <div class="tax-row">
+          <span class="tax-label"><strong>Reddito combinato (MQL5 + Etsy)</strong></span>
+          <span class="tax-value"><strong>€${redditoCombinato.toFixed(2)}</strong></span>
+        </div>
         <div class="tax-row">
           <span class="tax-label">Altri redditi</span>
           <span class="tax-value">€${altriRedditiValue.toFixed(2)}</span>
@@ -1635,8 +2053,8 @@
         </div>
         <hr style="border-color:rgba(255,255,255,0.1);margin:12px 0;">
         <div class="tax-row">
-          <span class="tax-label">IRPEF su MQL5 (aliquota marginale)</span>
-          <span class="tax-value red">€${irpefMQL5.toFixed(2)}</span>
+          <span class="tax-label">IRPEF su attività online (aliquota marginale)</span>
+          <span class="tax-value red">€${irpefOnline.toFixed(2)}</span>
         </div>
         <div class="tax-row">
           <span class="tax-label">INPS Gestione Separata (26.07%) ${inpsNote}</span>

@@ -230,6 +230,84 @@ export default async function handler(req, res) {
       }
     }
 
+    // ==================== ETSY SALES ====================
+    if (type === 'etsy') {
+      
+      // GET - List Etsy sales
+      if (req.method === 'GET') {
+        const { year } = req.query;
+        
+        let query = supabase
+          .from('etsy_sales')
+          .select('*')
+          .order('sale_date', { ascending: false });
+        
+        if (year) {
+          query = query
+            .gte('sale_date', `${year}-01-01`)
+            .lte('sale_date', `${year}-12-31`);
+        }
+
+        const { data, error } = await query;
+        if (error) throw error;
+        return res.status(200).json({ sales: data || [] });
+      }
+
+      // POST - Add Etsy sale
+      if (req.method === 'POST') {
+        const { 
+          sale_date, product_name, quantity, sale_price_eur, 
+          etsy_fees_eur, printify_cost_usd, exchange_rate,
+          client_name, notes 
+        } = req.body;
+
+        if (!sale_date || !product_name || !sale_price_eur) {
+          return res.status(400).json({ error: 'Missing required fields' });
+        }
+
+        const printifyEUR = (printify_cost_usd || 0) / (exchange_rate || 1);
+        const margin_eur = sale_price_eur - (etsy_fees_eur || 0) - printifyEUR;
+
+        const saleData = {
+          sale_date,
+          product_name,
+          quantity: quantity || 1,
+          sale_price_eur: parseFloat(sale_price_eur),
+          etsy_fees_eur: parseFloat(etsy_fees_eur) || 0,
+          printify_cost_usd: parseFloat(printify_cost_usd) || 0,
+          exchange_rate: parseFloat(exchange_rate) || 1,
+          margin_eur: Math.round(margin_eur * 100) / 100,
+          client_name: client_name || null,
+          notes: notes || null
+        };
+
+        const { data, error } = await supabase
+          .from('etsy_sales')
+          .insert([saleData])
+          .select()
+          .single();
+
+        if (error) throw error;
+        return res.status(201).json({ success: true, sale: data });
+      }
+
+      // DELETE - Remove Etsy sale
+      if (req.method === 'DELETE') {
+        const { id } = req.body;
+        if (!id) {
+          return res.status(400).json({ error: 'Missing sale ID' });
+        }
+
+        const { error } = await supabase
+          .from('etsy_sales')
+          .delete()
+          .eq('id', id);
+
+        if (error) throw error;
+        return res.status(200).json({ success: true });
+      }
+    }
+
     // ==================== EXPORT ====================
     if (type === 'export') {
       if (req.method === 'GET') {
@@ -255,11 +333,26 @@ export default async function handler(req, res) {
 
         const { data: sales } = await salesQuery;
 
+        // Get Etsy sales
+        let etsyQuery = supabase
+          .from('etsy_sales')
+          .select('*')
+          .order('sale_date', { ascending: false });
+        
+        if (year) {
+          etsyQuery = etsyQuery
+            .gte('sale_date', `${year}-01-01`)
+            .lte('sale_date', `${year}-12-31`);
+        }
+
+        const { data: etsySales } = await etsyQuery;
+
         return res.status(200).json({
           exportDate: new Date().toISOString(),
           year: year || 'all',
           licenses: licenses || [],
-          sales: sales || []
+          sales: sales || [],
+          etsy_sales: etsySales || []
         });
       }
     }
