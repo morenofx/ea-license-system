@@ -3135,12 +3135,18 @@
             const yearStart = new Date(year, 0, 1);   // 1 Gen
             const yearEnd = new Date(year, 11, 31, 23, 59, 59); // 31 Dic
             
-            // Valore Iniziale = ultimo balance PRIMA dell'1 Gen di quest'anno
-            // (escludendo bonus/credit)
             const beforeYear = timeline.filter(e => e.date < yearStart);
             let valIni = 0;
+            
             if (beforeYear.length > 0) {
+              // Conto esisteva già al 1° Gen: prendi ultimo balance dell'anno precedente
               valIni = Math.max(0, beforeYear[beforeYear.length - 1].balance - bonusCredits);
+            } else {
+              // Conto aperto durante l'anno: Valore Iniziale = primo deposito reale
+              const firstDeposit = timeline.find(e => e.date >= yearStart && e.date <= yearEnd && e.isDeposit);
+              if (firstDeposit) {
+                valIni = Math.max(0, firstDeposit.amount);
+              }
             }
             
             // Valore Finale = ultimo balance entro il 31 Dic di quest'anno
@@ -3152,22 +3158,29 @@
             }
             
             // Giorni reali di detenzione nell'anno
+            // Per conto aperto durante l'anno: dal primo deposito reale al 31 Dic
+            const firstDepositThisYear = timeline.find(e => e.date >= yearStart && e.date <= yearEnd && e.isDeposit);
             const firstEntryThisYear = timeline.find(e => e.date >= yearStart && e.date <= yearEnd);
+            const endDayMidnight = new Date(year, 11, 31); // 31 Dic a mezzanotte (per calcolo giorni preciso)
             let giorni = 365;
-            if (beforeYear.length === 0 && firstEntryThisYear) {
-              // Conto aperto durante l'anno: dal primo movimento al 31 Dic
+            if (beforeYear.length === 0 && firstDepositThisYear) {
+              // Conta giorni dal primo deposito reale (non dal bonus)
+              const startDay = new Date(firstDepositThisYear.date.getFullYear(), firstDepositThisYear.date.getMonth(), firstDepositThisYear.date.getDate());
+              giorni = Math.round((endDayMidnight - startDay) / (1000 * 60 * 60 * 24)) + 1;
+            } else if (beforeYear.length === 0 && firstEntryThisYear) {
+              // Fallback: primo movimento qualsiasi
               const startDay = new Date(firstEntryThisYear.date.getFullYear(), firstEntryThisYear.date.getMonth(), firstEntryThisYear.date.getDate());
-              const endDay = yearEnd;
-              giorni = Math.ceil((endDay - startDay) / (1000 * 60 * 60 * 24)) + 1;
+              giorni = Math.round((endDayMidnight - startDay) / (1000 * 60 * 60 * 24)) + 1;
             }
             // Se il conto è stato chiuso/svuotato durante l'anno
             const lastEntryThisYear = [...timeline].reverse().find(e => e.date >= yearStart && e.date <= yearEnd);
             if (lastEntryThisYear && (lastEntryThisYear.balance - bonusCredits) <= 0.01) {
-              // Conto chiuso: dal primo all'ultimo movimento
-              if (firstEntryThisYear) {
-                const startDay = beforeYear.length > 0 ? yearStart : new Date(firstEntryThisYear.date.getFullYear(), firstEntryThisYear.date.getMonth(), firstEntryThisYear.date.getDate());
+              // Conto chiuso: dal primo deposito all'ultimo movimento
+              const refStart = firstDepositThisYear || firstEntryThisYear;
+              if (refStart) {
+                const startDay = beforeYear.length > 0 ? yearStart : new Date(refStart.date.getFullYear(), refStart.date.getMonth(), refStart.date.getDate());
                 const endDay = new Date(lastEntryThisYear.date.getFullYear(), lastEntryThisYear.date.getMonth(), lastEntryThisYear.date.getDate());
-                giorni = Math.ceil((endDay - startDay) / (1000 * 60 * 60 * 24)) + 1;
+                giorni = Math.round((endDay - startDay) / (1000 * 60 * 60 * 24)) + 1;
               }
             }
             
