@@ -2686,6 +2686,15 @@
           localStorage.removeItem('eaDashPwd');
         });
       }
+      
+      // Ripristina dati MT5 da localStorage (se presenti)
+      if (loadMT5FromStorage()) {
+        const dropZone = document.getElementById('mt5DropZone');
+        dropZone.innerHTML = '<div style="font-size:48px;">📁</div><p>Trascina altri file o clicca</p><p style="color:rgba(255,255,255,0.4);font-size:12px;margin-top:8px;">✅ ' + mt5Accounts.length + ' account ripristinati</p>';
+        document.getElementById('mt5CurrencySettings').style.display = 'block';
+        consolidateMT5Data();
+        renderMT5Results();
+      }
     };
     
     // ==================== MT5 FISCAL ANALYZER ====================
@@ -2693,6 +2702,58 @@
     // Dati MT5
     let mt5Accounts = [];
     let mt5YearlyData = {};
+    
+    // Salva/carica MT5 da localStorage
+    function saveMT5ToStorage() {
+      try {
+        // Salva solo i dati essenziali (no oggetti Date — serializziamo le date come string)
+        const toSave = mt5Accounts.map(acc => ({
+          ...acc,
+          trades: acc.trades.map(t => ({ ...t, date: t.date.toISOString() })),
+          balanceTimeline: (acc.balanceTimeline || []).map(e => ({ ...e, date: e.date.toISOString() })),
+          minDate: acc.minDate ? acc.minDate.toISOString() : null,
+          maxDate: acc.maxDate ? acc.maxDate.toISOString() : null
+        }));
+        localStorage.setItem('mt5Accounts', JSON.stringify(toSave));
+        localStorage.setItem('mt5ExchangeRates', JSON.stringify(mt5ExchangeRates));
+        localStorage.setItem('mt5RatesFetched', JSON.stringify(mt5RatesFetched));
+      } catch (e) {
+        console.warn('Errore salvataggio MT5:', e);
+      }
+    }
+    
+    function loadMT5FromStorage() {
+      try {
+        const saved = localStorage.getItem('mt5Accounts');
+        if (!saved) return false;
+        
+        const parsed = JSON.parse(saved);
+        mt5Accounts = parsed.map(acc => ({
+          ...acc,
+          trades: acc.trades.map(t => ({ ...t, date: new Date(t.date) })),
+          balanceTimeline: (acc.balanceTimeline || []).map(e => ({ ...e, date: new Date(e.date) })),
+          minDate: acc.minDate ? new Date(acc.minDate) : null,
+          maxDate: acc.maxDate ? new Date(acc.maxDate) : null
+        }));
+        
+        // Ripristina cambi
+        const savedRates = localStorage.getItem('mt5ExchangeRates');
+        if (savedRates) mt5ExchangeRates = JSON.parse(savedRates);
+        const savedFetched = localStorage.getItem('mt5RatesFetched');
+        if (savedFetched) mt5RatesFetched = JSON.parse(savedFetched);
+        
+        return mt5Accounts.length > 0;
+      } catch (e) {
+        console.warn('Errore caricamento MT5:', e);
+        return false;
+      }
+    }
+    
+    function clearMT5Storage() {
+      localStorage.removeItem('mt5Accounts');
+      localStorage.removeItem('mt5ExchangeRates');
+      localStorage.removeItem('mt5RatesFetched');
+    }
     
     // Cambi EUR/USD fallback (usati solo se API non disponibile)
     const fallbackExchangeRates = {
@@ -2718,35 +2779,38 @@
       
       let dateStr;
       if (year < currentYear) {
-        // Anno passato: usa 31/12 (API ritorna ultimo giorno lavorativo disponibile)
         dateStr = `${year}-12-31`;
       } else if (year === currentYear) {
-        // Anno corrente: usa l'ultimo dato disponibile (ieri o oggi)
         const yesterday = new Date(currentDate);
         yesterday.setDate(yesterday.getDate() - 1);
         dateStr = yesterday.toISOString().split('T')[0];
       } else {
-        // Anno futuro: nessun dato disponibile
         return null;
       }
       
       try {
-        const res = await fetch(`https://api.frankfurter.app/${dateStr}?from=USD&to=EUR`);
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 3000); // 3 sec timeout
+        
+        const res = await fetch(`https://api.frankfurter.app/${dateStr}?from=USD&to=EUR`, {
+          signal: controller.signal
+        });
+        clearTimeout(timeout);
+        
         if (!res.ok) return null;
         const data = await res.json();
-        // data.rates.EUR = quanti EUR per 1 USD → invertiamo per avere EUR/USD
         const rate = 1 / data.rates.EUR;
-        return { rate, date: data.date }; // data.date = data effettiva usata dalla BCE
+        return { rate, date: data.date };
       } catch (e) {
-        console.warn(`Errore fetch cambio ${year}:`, e);
+        console.warn(`Cambio ${year}: usando fallback (${e.name === 'AbortError' ? 'timeout' : e.message})`);
         return null;
       }
     }
     
-    // Scarica tutti i cambi necessari per gli anni trovati nei report
+    // Scarica tutti i cambi in parallelo (non sequenziale)
     async function fetchAllYearEndRates(years) {
       const promises = Array.from(years).map(async year => {
-        if (mt5RatesFetched[year]) return; // già scaricato
+        if (mt5RatesFetched[year]) return;
         const result = await fetchYearEndRate(year);
         if (result) {
           mt5ExchangeRates[year] = result.rate;
@@ -2838,6 +2902,7 @@
         document.getElementById('mt5CurrencySettings').style.display = 'block';
         consolidateMT5Data();
         renderMT5Results();
+        saveMT5ToStorage();
       } else {
         dropZone.innerHTML = '<div style="font-size:48px;">📁</div><p>Trascina altri file o clicca</p>';
       }
@@ -3011,6 +3076,7 @@
             
             const balanceTimeline = [];
             let totalDeposits = 0, totalWithdrawals = 0, totalBonusCredits = 0;
+            let firstDealEntry = null, lastDealEntry = null; // per inferire balance quando mancano depositi
             
             if (dealsStart2 !== -1) {
               for (let i = dealsStart2; i < data.length; i++) {
@@ -3035,36 +3101,34 @@
                 if (!entryDate || isNaN(entryDate.getTime())) continue;
                 if (isNaN(balance)) continue;
                 
-                // Classifica operazione
-                const isCredit = type === 'credit';  // Bonus/Credit Facility
+                const entry = { date: entryDate, balance, amount, type, comment: String(row[13] || '') };
+                
+                // Traccia primo e ultimo deal (qualsiasi tipo) per fallback
+                if (!firstDealEntry) firstDealEntry = entry;
+                lastDealEntry = entry;
+                
+                // Solo balance/credit vanno nel timeline (no trade buy/sell)
+                const isCredit = type === 'credit';
                 const isBalanceOp = type === 'balance';
+                if (!isCredit && !isBalanceOp) continue;
+                
                 const isSwapAdj = isBalanceOp && (comment.includes('swap') || comment.includes('pnl'));
-                
-                // Deposito: qualsiasi operazione balance positiva che NON è un aggiustamento swap
-                // (copre tutti i formati broker: "Transfer In", "Transfer from", "Deposit", "Funding", ecc.)
                 const isDeposit = isBalanceOp && amount > 0 && !isSwapAdj;
-                
-                // Prelievo: qualsiasi operazione balance negativa che NON è un aggiustamento swap
-                // (copre: "Transfer Out", "Withdraw", "WDL", ecc.)
                 const isWithdrawal = isBalanceOp && amount < 0 && !isSwapAdj;
                 
                 if (isCredit) totalBonusCredits += amount;
                 if (isDeposit) totalDeposits += amount;
                 if (isWithdrawal) totalWithdrawals += Math.abs(amount);
                 
-                balanceTimeline.push({
-                  date: entryDate,
-                  balance: balance,
-                  amount: amount,
-                  type: type,
-                  comment: String(row[13] || ''),
-                  isCredit, isDeposit, isWithdrawal, isSwapAdj
-                });
+                entry.isCredit = isCredit;
+                entry.isDeposit = isDeposit;
+                entry.isWithdrawal = isWithdrawal;
+                entry.isSwapAdj = isSwapAdj;
+                balanceTimeline.push(entry);
               }
             }
             
             // Calcola valore iniziale/finale ESCLUDENDO bonus/credit
-            // Il balance reale = balance riportato - crediti bonus non prelevabili
             if (balanceTimeline.length > 0) {
               const firstRealEntry = balanceTimeline.find(e => e.isDeposit);
               
@@ -3072,17 +3136,36 @@
                 // Caso normale: c'è un deposito esplicito nel report
                 valoreIniziale = Math.max(0, firstRealEntry.balance - totalBonusCredits);
               } else {
-                // Nessun deposito nel report (es. ICMarkets: deposito fuori dal range del report)
-                // Inferisci il balance iniziale dalla prima riga dei Deals
-                const firstEntry = balanceTimeline[0];
-                // Per un "in" deal (amount=0) il balance è quello pre-esistente
-                // Per un "out" deal sottraiamo il profit per ottenere il balance precedente
-                const inferredStart = firstEntry.balance - (firstEntry.amount || 0);
-                valoreIniziale = Math.max(0, inferredStart - totalBonusCredits);
+                // Nessun deposito nel report ma ci sono operazioni balance (es. solo swap adj)
+                // Inferisci dal primo deal
+                if (firstDealEntry) {
+                  const inferredStart = firstDealEntry.balance - (firstDealEntry.amount || 0);
+                  valoreIniziale = Math.max(0, inferredStart - totalBonusCredits);
+                }
               }
               
               const lastEntry = balanceTimeline[balanceTimeline.length - 1];
-              valoreFinale = Math.max(0, lastEntry.balance - totalBonusCredits);
+              // Per il valore finale, usa l'ultimo tra timeline e lastDeal
+              const lastBalanceDate = lastEntry.date.getTime();
+              const lastDealDate = lastDealEntry ? lastDealEntry.date.getTime() : 0;
+              if (lastDealDate > lastBalanceDate && lastDealEntry) {
+                valoreFinale = Math.max(0, lastDealEntry.balance - totalBonusCredits);
+              } else {
+                valoreFinale = Math.max(0, lastEntry.balance - totalBonusCredits);
+              }
+            } else if (firstDealEntry) {
+              // Nessuna operazione balance/credit (es. ICMarkets senza depositi nel range)
+              const inferredStart = firstDealEntry.balance - (firstDealEntry.amount || 0);
+              valoreIniziale = Math.max(0, inferredStart - totalBonusCredits);
+              valoreFinale = lastDealEntry ? Math.max(0, lastDealEntry.balance - totalBonusCredits) : valoreIniziale;
+            }
+            
+            // Aggiungi firstDealEntry e lastDealEntry al timeline se non già presenti (per calcolo giorni)
+            if (firstDealEntry && (balanceTimeline.length === 0 || balanceTimeline[0].date.getTime() > firstDealEntry.date.getTime())) {
+              balanceTimeline.unshift({ ...firstDealEntry, isCredit: false, isDeposit: false, isWithdrawal: false, isSwapAdj: false });
+            }
+            if (lastDealEntry && (balanceTimeline.length === 0 || balanceTimeline[balanceTimeline.length - 1].date.getTime() < lastDealEntry.date.getTime())) {
+              balanceTimeline.push({ ...lastDealEntry, isCredit: false, isDeposit: false, isWithdrawal: false, isSwapAdj: false });
             }
             
             resolve({
@@ -3294,6 +3377,7 @@
       mt5ExchangeRates[year] = parseFloat(value) || 1.08;
       consolidateMT5Data();
       renderMT5Results();
+      saveMT5ToStorage();
     }
     
     async function resetMT5ExchangeRates() {
@@ -3313,6 +3397,7 @@
       
       consolidateMT5Data();
       renderMT5Results();
+      saveMT5ToStorage();
     }
     
     function renderMT5Results() {
@@ -3860,6 +3945,7 @@
       if (!confirm('Cancellare tutti i dati MT5 caricati?')) return;
       mt5Accounts = [];
       mt5YearlyData = {};
+      clearMT5Storage();
       document.getElementById('mt5Results').style.display = 'none';
       document.getElementById('mt5CurrencySettings').style.display = 'none';
       document.getElementById('mt5DropZone').innerHTML = '<div style="font-size:48px;">📊</div><p>Trascina qui i report MT5 (.xlsx)</p><p style="color:rgba(255,255,255,0.4);font-size:12px;margin-top:8px;">💡 Genera il report da MT5: Toolbox → Cronologia → Tasto destro → Report → Excel</p>';
