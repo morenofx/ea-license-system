@@ -2827,9 +2827,8 @@
           acc.trades.forEach(t => yearsFound.add(t.date.getFullYear()));
         });
         
-        // Scarica cambi EUR/USD al 31/12 per conti USD
-        const hasUSD = mt5Accounts.some(a => a.currency === 'USD');
-        if (hasUSD && yearsFound.size > 0) {
+        // Scarica cambi EUR/USD al 31/12 (sempre, anche per conti EUR — pronti per futuri conti USD)
+        if (yearsFound.size > 0) {
           dropZone.innerHTML = '<div style="font-size:48px;">💱</div><p>Scaricamento cambi BCE...</p>';
           await fetchAllYearEndRates(yearsFound);
         }
