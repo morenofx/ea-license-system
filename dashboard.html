@@ -3038,12 +3038,15 @@
                 // Classifica operazione
                 const isCredit = type === 'credit';  // Bonus/Credit Facility
                 const isBalanceOp = type === 'balance';
-                const isDeposit = isBalanceOp && amount > 0 && 
-                  (comment.includes('transfer in') || comment.includes('deposit') || 
-                   comment.includes('funding') || comment.includes('payment'));
-                const isWithdrawal = isBalanceOp && amount < 0 && 
-                  (comment.includes('transfer out') || comment.includes('withdraw'));
                 const isSwapAdj = isBalanceOp && (comment.includes('swap') || comment.includes('pnl'));
+                
+                // Deposito: qualsiasi operazione balance positiva che NON è un aggiustamento swap
+                // (copre tutti i formati broker: "Transfer In", "Transfer from", "Deposit", "Funding", ecc.)
+                const isDeposit = isBalanceOp && amount > 0 && !isSwapAdj;
+                
+                // Prelievo: qualsiasi operazione balance negativa che NON è un aggiustamento swap
+                // (copre: "Transfer Out", "Withdraw", "WDL", ecc.)
+                const isWithdrawal = isBalanceOp && amount < 0 && !isSwapAdj;
                 
                 if (isCredit) totalBonusCredits += amount;
                 if (isDeposit) totalDeposits += amount;
@@ -3063,10 +3066,20 @@
             // Calcola valore iniziale/finale ESCLUDENDO bonus/credit
             // Il balance reale = balance riportato - crediti bonus non prelevabili
             if (balanceTimeline.length > 0) {
-              // Il primo balance REALE è dopo il primo deposito vero, esclusi i credit
               const firstRealEntry = balanceTimeline.find(e => e.isDeposit);
-              const firstReal = firstRealEntry ? firstRealEntry.balance - totalBonusCredits : 0;
-              valoreIniziale = Math.max(0, firstReal);
+              
+              if (firstRealEntry) {
+                // Caso normale: c'è un deposito esplicito nel report
+                valoreIniziale = Math.max(0, firstRealEntry.balance - totalBonusCredits);
+              } else {
+                // Nessun deposito nel report (es. ICMarkets: deposito fuori dal range del report)
+                // Inferisci il balance iniziale dalla prima riga dei Deals
+                const firstEntry = balanceTimeline[0];
+                // Per un "in" deal (amount=0) il balance è quello pre-esistente
+                // Per un "out" deal sottraiamo il profit per ottenere il balance precedente
+                const inferredStart = firstEntry.balance - (firstEntry.amount || 0);
+                valoreIniziale = Math.max(0, inferredStart - totalBonusCredits);
+              }
               
               const lastEntry = balanceTimeline[balanceTimeline.length - 1];
               valoreFinale = Math.max(0, lastEntry.balance - totalBonusCredits);
@@ -3145,6 +3158,13 @@
               const firstDeposit = timeline.find(e => e.date >= yearStart && e.date <= yearEnd && e.isDeposit);
               if (firstDeposit) {
                 valIni = Math.max(0, firstDeposit.amount);
+              } else {
+                // Nessun deposito nel report (deposito fuori dal range esportato)
+                // Inferisci dal balance della prima riga deals di quest'anno
+                const firstEntryThisYr = timeline.find(e => e.date >= yearStart && e.date <= yearEnd);
+                if (firstEntryThisYr) {
+                  valIni = Math.max(0, (firstEntryThisYr.balance - (firstEntryThisYr.amount || 0)) - bonusCredits);
+                }
               }
             }
             
