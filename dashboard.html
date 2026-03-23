@@ -1089,12 +1089,12 @@
         
         <!-- Impostazioni Valuta -->
         <div id="mt5CurrencySettings" class="card" style="display:none;">
-          <div class="card-title">💱 Impostazioni Valuta</div>
+          <div class="card-title">💱 Cambi EUR/USD (fonte BCE al 31/12)</div>
           <div class="form-row">
             <div class="form-group">
-              <label>Cambio medio EUR/USD per anno</label>
+              <label>Cambio EUR/USD per anno — scaricato automaticamente dalla BCE</label>
               <p style="font-size:11px;color:rgba(255,255,255,0.5);margin-bottom:10px;">
-                Per conti in USD, i valori vengono convertiti in EUR usando questi cambi
+                Per conti in USD, i valori vengono convertiti in EUR al cambio del 31 dicembre (ultimo giorno lavorativo). Puoi sovrascrivere manualmente.
               </p>
             </div>
           </div>
@@ -1102,7 +1102,7 @@
             <!-- Popolato dinamicamente -->
           </div>
           <div style="margin-top:10px;">
-            <button class="btn btn-secondary" onclick="resetMT5ExchangeRates()">🔄 Ripristina Default</button>
+            <button class="btn btn-secondary" onclick="resetMT5ExchangeRates()">🔄 Riscarica da BCE</button>
           </div>
         </div>
         
@@ -2694,13 +2694,13 @@
     let mt5Accounts = [];
     let mt5YearlyData = {};
     
-    // Cambi medi EUR/USD ufficiali (fonte BCE)
-    const defaultExchangeRates = {
-      2021: 1.1827,
-      2022: 1.0530,
-      2023: 1.0813,
-      2024: 1.0813,
-      2025: 1.0850,
+    // Cambi EUR/USD fallback (usati solo se API non disponibile)
+    const fallbackExchangeRates = {
+      2021: 1.1326, // BCE 31/12/2021
+      2022: 1.0666, // BCE 30/12/2022
+      2023: 1.1050, // BCE 29/12/2023
+      2024: 1.0352, // BCE 31/12/2024
+      2025: 1.0850, // aggiornare a fine anno
       2026: 1.0900,
       2027: 1.0900,
       2028: 1.0900,
@@ -2708,7 +2708,53 @@
       2030: 1.0900
     };
     
-    let mt5ExchangeRates = { ...defaultExchangeRates };
+    let mt5ExchangeRates = { ...fallbackExchangeRates };
+    let mt5RatesFetched = {}; // traccia quali anni sono stati scaricati da API
+    
+    // Scarica cambio EUR/USD al 31/12 da Frankfurter (fonte BCE)
+    async function fetchYearEndRate(year) {
+      const currentYear = new Date().getFullYear();
+      const currentDate = new Date();
+      
+      let dateStr;
+      if (year < currentYear) {
+        // Anno passato: usa 31/12 (API ritorna ultimo giorno lavorativo disponibile)
+        dateStr = `${year}-12-31`;
+      } else if (year === currentYear) {
+        // Anno corrente: usa l'ultimo dato disponibile (ieri o oggi)
+        const yesterday = new Date(currentDate);
+        yesterday.setDate(yesterday.getDate() - 1);
+        dateStr = yesterday.toISOString().split('T')[0];
+      } else {
+        // Anno futuro: nessun dato disponibile
+        return null;
+      }
+      
+      try {
+        const res = await fetch(`https://api.frankfurter.app/${dateStr}?from=USD&to=EUR`);
+        if (!res.ok) return null;
+        const data = await res.json();
+        // data.rates.EUR = quanti EUR per 1 USD → invertiamo per avere EUR/USD
+        const rate = 1 / data.rates.EUR;
+        return { rate, date: data.date }; // data.date = data effettiva usata dalla BCE
+      } catch (e) {
+        console.warn(`Errore fetch cambio ${year}:`, e);
+        return null;
+      }
+    }
+    
+    // Scarica tutti i cambi necessari per gli anni trovati nei report
+    async function fetchAllYearEndRates(years) {
+      const promises = Array.from(years).map(async year => {
+        if (mt5RatesFetched[year]) return; // già scaricato
+        const result = await fetchYearEndRate(year);
+        if (result) {
+          mt5ExchangeRates[year] = result.rate;
+          mt5RatesFetched[year] = result.date;
+        }
+      });
+      await Promise.all(promises);
+    }
     
     // Broker e paesi
     const brokerCountries = {
@@ -2732,6 +2778,9 @@
       'ig': { code: '826', name: 'Regno Unito' },
       'admirals': { code: '372', name: 'Estonia' },
       'admiral markets': { code: '372', name: 'Estonia' },
+      'axicorp': { code: '196', name: 'Cipro' },
+      'axi': { code: '196', name: 'Cipro' },
+      'axitrader': { code: '196', name: 'Cipro' },
       'default': { code: '196', name: 'Cipro' }
     };
     
@@ -2758,7 +2807,7 @@
       const files = Array.from(event.target.files);
       const dropZone = document.getElementById('mt5DropZone');
       
-      dropZone.innerHTML = '<div style="font-size:48px;">⏳</div><p>Elaborazione in corso...</p>';
+      dropZone.innerHTML = '<div style="font-size:48px;">⏳</div><p>Elaborazione file...</p>';
       
       for (const file of files) {
         if (file.name.match(/\.xlsx?$/i)) {
@@ -2771,12 +2820,27 @@
         }
       }
       
-      dropZone.innerHTML = '<div style="font-size:48px;">📁</div><p>Trascina altri file o clicca</p><p style="color:rgba(255,255,255,0.4);font-size:12px;margin-top:8px;">✅ ' + mt5Accounts.length + ' account caricati</p>';
-      
       if (mt5Accounts.length > 0) {
+        // Trova tutti gli anni dai trade
+        const yearsFound = new Set();
+        mt5Accounts.forEach(acc => {
+          acc.trades.forEach(t => yearsFound.add(t.date.getFullYear()));
+        });
+        
+        // Scarica cambi EUR/USD al 31/12 per conti USD
+        const hasUSD = mt5Accounts.some(a => a.currency === 'USD');
+        if (hasUSD && yearsFound.size > 0) {
+          dropZone.innerHTML = '<div style="font-size:48px;">💱</div><p>Scaricamento cambi BCE...</p>';
+          await fetchAllYearEndRates(yearsFound);
+        }
+        
+        dropZone.innerHTML = '<div style="font-size:48px;">📁</div><p>Trascina altri file o clicca</p><p style="color:rgba(255,255,255,0.4);font-size:12px;margin-top:8px;">✅ ' + mt5Accounts.length + ' account caricati</p>';
+        
         document.getElementById('mt5CurrencySettings').style.display = 'block';
         consolidateMT5Data();
         renderMT5Results();
+      } else {
+        dropZone.innerHTML = '<div style="font-size:48px;">📁</div><p>Trascina altri file o clicca</p>';
       }
     }
     
@@ -2940,24 +3004,73 @@
               }
             }
             
-            // Calcola valore iniziale/finale da Deals (balance)
-            let dealsStart = -1;
+            // Costruisci timeline completa dei balance dalla sezione Deals
+            let dealsStart2 = -1;
             for (let i = 0; i < data.length; i++) {
-              if (data[i][0] === 'Deals') { dealsStart = i + 2; break; }
+              if (data[i][0] === 'Deals') { dealsStart2 = i + 2; break; }
             }
             
-            if (dealsStart !== -1) {
-              let firstBalance = null, lastBalance = null;
-              for (let i = dealsStart; i < data.length; i++) {
+            const balanceTimeline = [];
+            let totalDeposits = 0, totalWithdrawals = 0, totalBonusCredits = 0;
+            
+            if (dealsStart2 !== -1) {
+              for (let i = dealsStart2; i < data.length; i++) {
                 const row = data[i];
-                const balance = parseFloat(row[12]) || 0;
-                if (balance > 0) {
-                  if (firstBalance === null) firstBalance = balance;
-                  lastBalance = balance;
+                const type = String(row[3] || '').toLowerCase();
+                const balance = parseFloat(row[12]);
+                const amount = parseFloat(row[11]) || 0;
+                const comment = String(row[13] || '').toLowerCase();
+                
+                // Stop a sezioni successive
+                if (row[0] && ['Working Orders', 'Orders', 'Results'].includes(String(row[0]))) break;
+                
+                // Parsa data
+                let entryDate;
+                if (row[0] instanceof Date) {
+                  entryDate = row[0];
+                } else {
+                  const ds = String(row[0] || '');
+                  if (!ds.match(/^\d{4}[\.\-]/)) continue;
+                  entryDate = new Date(ds.replace(/\./g, '-'));
                 }
+                if (!entryDate || isNaN(entryDate.getTime())) continue;
+                if (isNaN(balance)) continue;
+                
+                // Classifica operazione
+                const isCredit = type === 'credit';  // Bonus/Credit Facility
+                const isBalanceOp = type === 'balance';
+                const isDeposit = isBalanceOp && amount > 0 && 
+                  (comment.includes('transfer in') || comment.includes('deposit') || 
+                   comment.includes('funding') || comment.includes('payment'));
+                const isWithdrawal = isBalanceOp && amount < 0 && 
+                  (comment.includes('transfer out') || comment.includes('withdraw'));
+                const isSwapAdj = isBalanceOp && (comment.includes('swap') || comment.includes('pnl'));
+                
+                if (isCredit) totalBonusCredits += amount;
+                if (isDeposit) totalDeposits += amount;
+                if (isWithdrawal) totalWithdrawals += Math.abs(amount);
+                
+                balanceTimeline.push({
+                  date: entryDate,
+                  balance: balance,
+                  amount: amount,
+                  type: type,
+                  comment: String(row[13] || ''),
+                  isCredit, isDeposit, isWithdrawal, isSwapAdj
+                });
               }
-              valoreIniziale = firstBalance || 0;
-              valoreFinale = lastBalance || 0;
+            }
+            
+            // Calcola valore iniziale/finale ESCLUDENDO bonus/credit
+            // Il balance reale = balance riportato - crediti bonus non prelevabili
+            if (balanceTimeline.length > 0) {
+              // Il primo balance REALE è dopo il primo deposito vero, esclusi i credit
+              const firstRealEntry = balanceTimeline.find(e => e.isDeposit);
+              const firstReal = firstRealEntry ? firstRealEntry.balance - totalBonusCredits : 0;
+              valoreIniziale = Math.max(0, firstReal);
+              
+              const lastEntry = balanceTimeline[balanceTimeline.length - 1];
+              valoreFinale = Math.max(0, lastEntry.balance - totalBonusCredits);
             }
             
             resolve({
@@ -2974,6 +3087,10 @@
               losses,
               valoreIniziale,
               valoreFinale,
+              balanceTimeline,
+              totalDeposits,
+              totalWithdrawals,
+              totalBonusCredits,
               minDate: trades.length > 0 ? trades[0].date : null,
               maxDate: trades.length > 0 ? trades[trades.length - 1].date : null,
               fileName: file.name
@@ -2994,6 +3111,9 @@
       const yearsFound = new Set();
       
       mt5Accounts.forEach(acc => {
+        const timeline = acc.balanceTimeline || [];
+        const bonusCredits = acc.totalBonusCredits || 0;
+        
         acc.trades.forEach(trade => {
           const year = trade.date.getFullYear();
           yearsFound.add(year);
@@ -3011,6 +3131,46 @@
           
           const accKey = acc.accountNumber;
           if (!mt5YearlyData[year].accounts[accKey]) {
+            // Calcola Valore Iniziale/Finale per QUESTO anno dal timeline
+            const yearStart = new Date(year, 0, 1);   // 1 Gen
+            const yearEnd = new Date(year, 11, 31, 23, 59, 59); // 31 Dic
+            
+            // Valore Iniziale = ultimo balance PRIMA dell'1 Gen di quest'anno
+            // (escludendo bonus/credit)
+            const beforeYear = timeline.filter(e => e.date < yearStart);
+            let valIni = 0;
+            if (beforeYear.length > 0) {
+              valIni = Math.max(0, beforeYear[beforeYear.length - 1].balance - bonusCredits);
+            }
+            
+            // Valore Finale = ultimo balance entro il 31 Dic di quest'anno
+            // (escludendo bonus/credit)
+            const untilYearEnd = timeline.filter(e => e.date <= yearEnd);
+            let valFin = 0;
+            if (untilYearEnd.length > 0) {
+              valFin = Math.max(0, untilYearEnd[untilYearEnd.length - 1].balance - bonusCredits);
+            }
+            
+            // Giorni reali di detenzione nell'anno
+            const firstEntryThisYear = timeline.find(e => e.date >= yearStart && e.date <= yearEnd);
+            let giorni = 365;
+            if (beforeYear.length === 0 && firstEntryThisYear) {
+              // Conto aperto durante l'anno: dal primo movimento al 31 Dic
+              const startDay = new Date(firstEntryThisYear.date.getFullYear(), firstEntryThisYear.date.getMonth(), firstEntryThisYear.date.getDate());
+              const endDay = yearEnd;
+              giorni = Math.ceil((endDay - startDay) / (1000 * 60 * 60 * 24)) + 1;
+            }
+            // Se il conto è stato chiuso/svuotato durante l'anno
+            const lastEntryThisYear = [...timeline].reverse().find(e => e.date >= yearStart && e.date <= yearEnd);
+            if (lastEntryThisYear && (lastEntryThisYear.balance - bonusCredits) <= 0.01) {
+              // Conto chiuso: dal primo all'ultimo movimento
+              if (firstEntryThisYear) {
+                const startDay = beforeYear.length > 0 ? yearStart : new Date(firstEntryThisYear.date.getFullYear(), firstEntryThisYear.date.getMonth(), firstEntryThisYear.date.getDate());
+                const endDay = new Date(lastEntryThisYear.date.getFullYear(), lastEntryThisYear.date.getMonth(), lastEntryThisYear.date.getDate());
+                giorni = Math.ceil((endDay - startDay) / (1000 * 60 * 60 * 24)) + 1;
+              }
+            }
+            
             mt5YearlyData[year].accounts[accKey] = {
               accountName: acc.accountName,
               accountNumber: acc.accountNumber,
@@ -3019,10 +3179,12 @@
               countryInfo: acc.countryInfo,
               trades: 0, wins: 0, losses: 0,
               grossProfit: 0, grossLoss: 0, netProfit: 0,
-              valoreIniziale: acc.valoreIniziale,
-              valoreFinale: 0,
-              giorni: 0,
-              ivafe: 0
+              valoreIniziale: valIni,
+              valoreFinale: valFin,
+              giorni: giorni,
+              ivafe: 0,
+              totalDeposits: acc.totalDeposits || 0,
+              totalBonusCredits: bonusCredits
             };
           }
           
@@ -3036,7 +3198,6 @@
             yearAcc.losses++;
           }
           yearAcc.netProfit = yearAcc.grossProfit + yearAcc.grossLoss;
-          yearAcc.valoreFinale = acc.valoreFinale;
         });
       });
       
@@ -3045,7 +3206,7 @@
         const data = mt5YearlyData[year];
         
         Object.values(data.accounts).forEach(acc => {
-          // Converti in EUR se necessario
+          // Converti in EUR se necessario (per conti USD)
           const rate = acc.currency === 'USD' ? mt5ExchangeRates[year] || 1.08 : 1;
           acc.grossProfitEUR = acc.grossProfit / rate;
           acc.grossLossEUR = acc.grossLoss / rate;
@@ -3053,10 +3214,7 @@
           acc.valoreInizialeEUR = acc.valoreIniziale / rate;
           acc.valoreFinaleEUR = acc.valoreFinale / rate;
           
-          // Giorni detenzione (approssimato a 365 se annuale)
-          acc.giorni = 365;
-          
-          // IVAFE: 0.2% sul valore medio
+          // IVAFE: 0.2% sul valore medio, proporzionato ai giorni reali
           const valoreMedio = (acc.valoreInizialeEUR + acc.valoreFinaleEUR) / 2;
           acc.ivafe = valoreMedio * 0.002 * (acc.giorni / 365);
           
@@ -3085,9 +3243,13 @@
       sortedYears.forEach(year => {
         const div = document.createElement('div');
         div.className = 'form-group';
-        div.style.minWidth = '120px';
+        div.style.minWidth = '140px';
+        const sourceDate = mt5RatesFetched[year];
+        const sourceLabel = sourceDate 
+          ? `<span style="font-size:10px;color:#22c55e;">✅ BCE ${sourceDate}</span>` 
+          : `<span style="font-size:10px;color:#f59e0b;">⚠️ Fallback</span>`;
         div.innerHTML = `
-          <label>${year}</label>
+          <label>${year} ${sourceLabel}</label>
           <input type="number" step="0.0001" value="${mt5ExchangeRates[year] || 1.08}" 
                  onchange="updateMT5ExchangeRate(${year}, this.value)" 
                  style="width:100%;">
@@ -3102,8 +3264,21 @@
       renderMT5Results();
     }
     
-    function resetMT5ExchangeRates() {
-      mt5ExchangeRates = { ...defaultExchangeRates };
+    async function resetMT5ExchangeRates() {
+      mt5RatesFetched = {};
+      mt5ExchangeRates = { ...fallbackExchangeRates };
+      
+      const yearsFound = new Set();
+      mt5Accounts.forEach(acc => {
+        acc.trades.forEach(t => yearsFound.add(t.date.getFullYear()));
+      });
+      
+      if (yearsFound.size > 0) {
+        showStatus('⏳ Scaricamento cambi BCE...');
+        await fetchAllYearEndRates(yearsFound);
+        showStatus('✅ Cambi aggiornati dalla BCE');
+      }
+      
       consolidateMT5Data();
       renderMT5Results();
     }
@@ -3161,6 +3336,9 @@
         let accountsHTML = '';
         Object.values(data.accounts).forEach(acc => {
           const impAcc = acc.netProfitEUR > 0 ? acc.netProfitEUR * 0.26 : 0;
+          const bonusWarn = acc.totalBonusCredits > 0 
+            ? `<div class="mt5-stat"><div class="label">Bonus escluso</div><div class="value" style="color:#f59e0b;">€${(acc.totalBonusCredits / (acc.currency === 'USD' ? (mt5ExchangeRates[year] || 1.08) : 1)).toFixed(2)}</div></div>` 
+            : '';
           accountsHTML += `
             <div class="mt5-account-row">
               <div class="mt5-stat">
@@ -3188,9 +3366,18 @@
                 <div class="value mt5-loss">€${impAcc.toFixed(2)}</div>
               </div>
               <div class="mt5-stat">
+                <div class="label">Val.Ini/Fin €</div>
+                <div class="value" style="font-size:12px;">${acc.valoreInizialeEUR.toFixed(0)} → ${acc.valoreFinaleEUR.toFixed(0)}</div>
+              </div>
+              <div class="mt5-stat">
+                <div class="label">Giorni</div>
+                <div class="value">${acc.giorni}</div>
+              </div>
+              <div class="mt5-stat">
                 <div class="label">IVAFE</div>
                 <div class="value" style="color:#fbbf24;">€${acc.ivafe.toFixed(2)}</div>
               </div>
+              ${bonusWarn}
             </div>
           `;
         });
@@ -3334,6 +3521,14 @@
       
       let accountsHTML = '';
       Object.values(data.accounts).forEach((acc, idx) => {
+        const bonusNote = acc.totalBonusCredits > 0 
+          ? `<div style="margin-top:8px;padding:8px 12px;background:#fef3c7;border:1px solid #f59e0b;border-radius:8px;font-size:12px;color:#92400e;">
+              ⚠️ Bonus/Credit escluso dal calcolo: € ${(acc.totalBonusCredits / (acc.currency === 'USD' ? (mt5ExchangeRates[year] || 1.08) : 1)).toFixed(2)} (non prelevabile)
+             </div>` 
+          : '';
+        const depositNote = acc.totalDeposits > 0 
+          ? `<div><strong>Depositi reali:</strong> € ${(acc.totalDeposits / (acc.currency === 'USD' ? (mt5ExchangeRates[year] || 1.08) : 1)).toFixed(2)}</div>` 
+          : '';
         accountsHTML += `
           <div style="background:#f0fdf4;border:2px solid #22c55e;border-radius:12px;padding:20px;margin-bottom:16px;">
             <h3 style="color:#16a34a;margin-bottom:12px;">Account #${idx + 1}: ${acc.accountNumber}</h3>
@@ -3344,7 +3539,9 @@
               <div><strong>Giorni detenzione:</strong> ${acc.giorni}</div>
               <div><strong>Valore Iniziale:</strong> € ${acc.valoreInizialeEUR.toFixed(2)}</div>
               <div><strong>Valore Finale:</strong> € ${acc.valoreFinaleEUR.toFixed(2)}</div>
+              ${depositNote}
             </div>
+            ${bonusNote}
             <div style="margin-top:16px;padding-top:12px;border-top:1px solid #bbf7d0;text-align:right;">
               <span style="font-size:18px;font-weight:700;color:#ca8a04;">IVAFE: € ${acc.ivafe.toFixed(2)}</span>
             </div>
@@ -3541,9 +3738,12 @@
       
       // Account boxes
       Object.values(data.accounts).forEach((acc, idx) => {
+        const hasBonus = acc.totalBonusCredits > 0;
+        const boxHeight = hasBonus ? 55 : 45;
+        
         doc.setFillColor(240, 253, 244);
         doc.setDrawColor(34, 197, 94);
-        doc.roundedRect(15, y, 180, 45, 3, 3, 'FD');
+        doc.roundedRect(15, y, 180, boxHeight, 3, 3, 'FD');
         
         doc.setFontSize(12);
         doc.setTextColor(22, 101, 52);
@@ -3558,11 +3758,18 @@
         doc.text(`Valore Iniziale: € ${acc.valoreInizialeEUR.toFixed(2)}`, 110, y + 20);
         doc.text(`Valore Finale: € ${acc.valoreFinaleEUR.toFixed(2)}`, 110, y + 28);
         
+        if (hasBonus) {
+          doc.setFontSize(8);
+          doc.setTextColor(180, 100, 0);
+          const bonusEUR = acc.totalBonusCredits / (acc.currency === 'USD' ? (mt5ExchangeRates[year] || 1.08) : 1);
+          doc.text(`* Bonus/Credit escluso: € ${bonusEUR.toFixed(2)} (non prelevabile)`, 20, y + 44);
+        }
+        
         doc.setFontSize(12);
         doc.setTextColor(202, 138, 4);
         doc.text(`IVAFE: € ${acc.ivafe.toFixed(2)}`, 110, y + 38);
         
-        y += 52;
+        y += boxHeight + 7;
       });
       
       // Box totale IVAFE
