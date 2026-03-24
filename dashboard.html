@@ -3314,6 +3314,77 @@
           }
           yearAcc.netProfit = yearAcc.grossProfit + yearAcc.grossLoss;
         });
+        
+        // Aggiungi anni dal timeline dove ci sono depositi/movimenti ma NESSUN trade
+        // (es. ICMarkets: deposito €9.73 il 13/12/2025, primo trade il 09/01/2026)
+        const timelineYears = new Set();
+        timeline.forEach(e => timelineYears.add(e.date.getFullYear()));
+        
+        timelineYears.forEach(year => {
+          yearsFound.add(year);
+          const accKey = acc.accountNumber;
+          
+          if (!mt5YearlyData[year]) {
+            mt5YearlyData[year] = {
+              accounts: {},
+              totals: {
+                trades: 0, wins: 0, losses: 0,
+                grossProfit: 0, grossLoss: 0, netProfit: 0,
+                valoreIniziale: 0, valoreFinale: 0, ivafe: 0
+              }
+            };
+          }
+          
+          // Se l'account è già presente per questo anno (creato dal loop trade), skip
+          if (mt5YearlyData[year].accounts[accKey]) return;
+          
+          // Calcola valori per questo anno (solo RW, nessun trade)
+          const yearStart = new Date(year, 0, 1);
+          const yearEnd = new Date(year, 11, 31, 23, 59, 59);
+          
+          const beforeYear = timeline.filter(e => e.date < yearStart);
+          let valIni = 0;
+          
+          if (beforeYear.length > 0) {
+            valIni = Math.max(0, beforeYear[beforeYear.length - 1].balance - bonusCredits);
+          } else {
+            const firstDeposit = timeline.find(e => e.date >= yearStart && e.date <= yearEnd && e.isDeposit);
+            if (firstDeposit) {
+              valIni = Math.max(0, firstDeposit.amount);
+            }
+          }
+          
+          const untilYearEnd = timeline.filter(e => e.date <= yearEnd);
+          let valFin = 0;
+          if (untilYearEnd.length > 0) {
+            valFin = Math.max(0, untilYearEnd[untilYearEnd.length - 1].balance - bonusCredits);
+          }
+          
+          // Giorni
+          const firstEntryThisYear = timeline.find(e => e.date >= yearStart && e.date <= yearEnd);
+          const endDayMidnight = new Date(year, 11, 31);
+          let giorni = 365;
+          if (beforeYear.length === 0 && firstEntryThisYear) {
+            const startDay = new Date(firstEntryThisYear.date.getFullYear(), firstEntryThisYear.date.getMonth(), firstEntryThisYear.date.getDate());
+            giorni = Math.round((endDayMidnight - startDay) / (1000 * 60 * 60 * 24)) + 1;
+          }
+          
+          mt5YearlyData[year].accounts[accKey] = {
+            accountName: acc.accountName,
+            accountNumber: acc.accountNumber,
+            company: acc.company,
+            currency: acc.currency,
+            countryInfo: acc.countryInfo,
+            trades: 0, wins: 0, losses: 0,
+            grossProfit: 0, grossLoss: 0, netProfit: 0,
+            valoreIniziale: valIni,
+            valoreFinale: valFin,
+            giorni: giorni,
+            ivafe: 0,
+            totalDeposits: acc.totalDeposits || 0,
+            totalBonusCredits: bonusCredits
+          };
+        });
       });
       
       // Calcola totali e IVAFE per ogni anno
