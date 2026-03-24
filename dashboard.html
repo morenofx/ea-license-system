@@ -3298,7 +3298,9 @@
               valoreFinale: valFin,
               giorni: giorni,
               ivafe: 0,
-              totalDeposits: acc.totalDeposits || 0,
+              // Depositi e prelievi di QUESTO anno (non totale report)
+              yearDeposits: timeline.filter(e => e.date >= yearStart && e.date <= yearEnd && e.isDeposit).reduce((s, e) => s + e.amount, 0),
+              yearWithdrawals: timeline.filter(e => e.date >= yearStart && e.date <= yearEnd && e.isWithdrawal).reduce((s, e) => s + Math.abs(e.amount), 0),
               totalBonusCredits: bonusCredits
             };
           }
@@ -3381,7 +3383,8 @@
             valoreFinale: valFin,
             giorni: giorni,
             ivafe: 0,
-            totalDeposits: acc.totalDeposits || 0,
+            yearDeposits: timeline.filter(e => e.date >= yearStart && e.date <= yearEnd && e.isDeposit).reduce((s, e) => s + e.amount, 0),
+            yearWithdrawals: timeline.filter(e => e.date >= yearStart && e.date <= yearEnd && e.isWithdrawal).reduce((s, e) => s + Math.abs(e.amount), 0),
             totalBonusCredits: bonusCredits
           };
         });
@@ -3527,6 +3530,13 @@
           const bonusWarn = acc.totalBonusCredits > 0 
             ? `<div class="mt5-stat"><div class="label">Bonus escluso</div><div class="value" style="color:#f59e0b;">€${(acc.totalBonusCredits / (acc.currency === 'USD' ? (mt5ExchangeRates[year] || 1.08) : 1)).toFixed(2)}</div></div>` 
             : '';
+          const rateInline = acc.currency === 'USD' ? (mt5ExchangeRates[year] || 1.08) : 1;
+          const depositsInfo = acc.yearDeposits > 0 
+            ? `<div class="mt5-stat"><div class="label">Depositi ${year}</div><div class="value" style="color:#22c55e;">€${(acc.yearDeposits / rateInline).toFixed(0)}</div></div>` 
+            : '';
+          const withdrawalsInfo = acc.yearWithdrawals > 0 
+            ? `<div class="mt5-stat"><div class="label">Prelievi ${year}</div><div class="value" style="color:#ef4444;">€${(acc.yearWithdrawals / rateInline).toFixed(0)}</div></div>` 
+            : '';
           accountsHTML += `
             <div class="mt5-account-row">
               <div class="mt5-stat">
@@ -3565,6 +3575,8 @@
                 <div class="label">IVAFE</div>
                 <div class="value" style="color:#fbbf24;">€${acc.ivafe.toFixed(2)}</div>
               </div>
+              ${depositsInfo}
+              ${withdrawalsInfo}
               ${bonusWarn}
             </div>
           `;
@@ -3714,8 +3726,12 @@
               ⚠️ Bonus/Credit escluso dal calcolo: € ${(acc.totalBonusCredits / (acc.currency === 'USD' ? (mt5ExchangeRates[year] || 1.08) : 1)).toFixed(2)} (non prelevabile)
              </div>` 
           : '';
-        const depositNote = acc.totalDeposits > 0 
-          ? `<div><strong>Depositi reali:</strong> € ${(acc.totalDeposits / (acc.currency === 'USD' ? (mt5ExchangeRates[year] || 1.08) : 1)).toFixed(2)}</div>` 
+        const rate = acc.currency === 'USD' ? (mt5ExchangeRates[year] || 1.08) : 1;
+        const depositNote = acc.yearDeposits > 0 
+          ? `<div><strong>Depositi ${year}:</strong> € ${(acc.yearDeposits / rate).toFixed(2)}</div>` 
+          : '';
+        const withdrawalNote = acc.yearWithdrawals > 0 
+          ? `<div><strong>Prelievi ${year}:</strong> € ${(acc.yearWithdrawals / rate).toFixed(2)}</div>` 
           : '';
         accountsHTML += `
           <div style="background:#f0fdf4;border:2px solid #22c55e;border-radius:12px;padding:20px;margin-bottom:16px;">
@@ -3728,6 +3744,7 @@
               <div><strong>Valore Iniziale:</strong> € ${acc.valoreInizialeEUR.toFixed(2)}</div>
               <div><strong>Valore Finale:</strong> € ${acc.valoreFinaleEUR.toFixed(2)}</div>
               ${depositNote}
+              ${withdrawalNote}
             </div>
             ${bonusNote}
             <div style="margin-top:16px;padding-top:12px;border-top:1px solid #bbf7d0;text-align:right;">
@@ -3927,7 +3944,14 @@
       // Account boxes
       Object.values(data.accounts).forEach((acc, idx) => {
         const hasBonus = acc.totalBonusCredits > 0;
-        const boxHeight = hasBonus ? 55 : 45;
+        const hasDeposits = acc.yearDeposits > 0;
+        const hasWithdrawals = acc.yearWithdrawals > 0;
+        let boxHeight = 45;
+        let extraLine = 0;
+        if (hasDeposits || hasWithdrawals) { boxHeight += 10; extraLine++; }
+        if (hasBonus) { boxHeight += 10; extraLine++; }
+        
+        const pdfRate = acc.currency === 'USD' ? (mt5ExchangeRates[year] || 1.08) : 1;
         
         doc.setFillColor(240, 253, 244);
         doc.setDrawColor(34, 197, 94);
@@ -3946,11 +3970,23 @@
         doc.text(`Valore Iniziale: € ${acc.valoreInizialeEUR.toFixed(2)}`, 110, y + 20);
         doc.text(`Valore Finale: € ${acc.valoreFinaleEUR.toFixed(2)}`, 110, y + 28);
         
+        let noteY = 44;
+        if (hasDeposits || hasWithdrawals) {
+          doc.setFontSize(9);
+          doc.setTextColor(0, 100, 0);
+          let movText = '';
+          if (hasDeposits) movText += `Depositi ${year}: € ${(acc.yearDeposits / pdfRate).toFixed(2)}`;
+          if (hasDeposits && hasWithdrawals) movText += '  |  ';
+          if (hasWithdrawals) movText += `Prelievi ${year}: € ${(acc.yearWithdrawals / pdfRate).toFixed(2)}`;
+          doc.text(movText, 20, y + noteY);
+          noteY += 10;
+        }
+        
         if (hasBonus) {
           doc.setFontSize(8);
           doc.setTextColor(180, 100, 0);
-          const bonusEUR = acc.totalBonusCredits / (acc.currency === 'USD' ? (mt5ExchangeRates[year] || 1.08) : 1);
-          doc.text(`* Bonus/Credit escluso: € ${bonusEUR.toFixed(2)} (non prelevabile)`, 20, y + 44);
+          const bonusEUR = acc.totalBonusCredits / pdfRate;
+          doc.text(`* Bonus/Credit escluso: € ${bonusEUR.toFixed(2)} (non prelevabile)`, 20, y + noteY);
         }
         
         doc.setFontSize(12);
