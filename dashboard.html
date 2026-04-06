@@ -1501,6 +1501,9 @@
       // Tipo vendita
       $('saleType').value = sale.sale_type || 'purchase';
       
+      // Il cambio salvato è valido — bordo neutro
+      $('saleExchangeRate').style.borderColor = '#333';
+      
       updateSalePreview();
       
       // Scroll al form
@@ -1528,27 +1531,60 @@
       rateField.value = '...';
       rateField.style.borderColor = '#333';
       
+      const date = dateField.value;
+      
+      // Tentativo 1: Frankfurter (fonte BCE)
       try {
-        const date = dateField.value;
         const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), 5000);
+        const timeout = setTimeout(() => controller.abort(), 4000);
         
         const res = await fetch(`https://api.frankfurter.app/${date}?from=USD&to=EUR`, {
           signal: controller.signal
         });
         clearTimeout(timeout);
         
-        const data = await res.json();
-        const rate = 1 / data.rates.EUR;
-        rateField.value = rate.toFixed(4);
-        rateField.style.borderColor = '#22c55e';
-        updateSalePreview();
+        if (res.ok) {
+          const data = await res.json();
+          const rate = 1 / data.rates.EUR;
+          rateField.value = rate.toFixed(4);
+          rateField.style.borderColor = '#22c55e';
+          updateSalePreview();
+          return;
+        }
       } catch (e) {
-        rateField.value = '1.1500';
-        rateField.style.borderColor = '#ef4444';
-        showStatus('⚠️ Cambio non scaricato — valore approssimato, verificare manualmente!', true);
-        updateSalePreview();
+        console.warn('Frankfurter fallito:', e.name);
       }
+      
+      // Tentativo 2: API backup (open.er-api.com)
+      try {
+        const controller2 = new AbortController();
+        const timeout2 = setTimeout(() => controller2.abort(), 4000);
+        
+        const res2 = await fetch(`https://open.er-api.com/v6/latest/USD`, {
+          signal: controller2.signal
+        });
+        clearTimeout(timeout2);
+        
+        if (res2.ok) {
+          const data2 = await res2.json();
+          if (data2.rates && data2.rates.EUR) {
+            const rate = 1 / data2.rates.EUR;
+            rateField.value = rate.toFixed(4);
+            rateField.style.borderColor = '#f59e0b'; // giallo = backup API (non data esatta)
+            showStatus('ℹ️ Cambio da API backup — potrebbe non corrispondere alla data esatta');
+            updateSalePreview();
+            return;
+          }
+        }
+      } catch (e) {
+        console.warn('Backup API fallita:', e.name);
+      }
+      
+      // Fallback statico
+      rateField.value = '1.1500';
+      rateField.style.borderColor = '#ef4444';
+      showStatus('⚠️ Cambio non scaricato — valore approssimato 1.15, verificare manualmente!', true);
+      updateSalePreview();
     }
     
     async function saveSale() {
@@ -1904,23 +1940,43 @@
       const rateField = $('etsyExchangeRate');
       if (!dateField.value) return;
       rateField.value = '...';
+      
+      const date = dateField.value;
+      
+      // Tentativo 1: Frankfurter
       try {
-        const date = dateField.value;
         const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), 5000);
-        const res = await fetch(`https://api.frankfurter.app/${date}?from=USD&to=EUR`, {
-          signal: controller.signal
-        });
+        const timeout = setTimeout(() => controller.abort(), 4000);
+        const res = await fetch(`https://api.frankfurter.app/${date}?from=USD&to=EUR`, { signal: controller.signal });
         clearTimeout(timeout);
-        const data = await res.json();
-        const rate = 1 / data.rates.EUR;
-        rateField.value = rate.toFixed(4);
-        updateEtsyPreview();
-      } catch {
-        rateField.value = '1.1500';
-        showStatus('⚠️ Cambio Etsy non scaricato — verificare manualmente!', true);
-        updateEtsyPreview();
-      }
+        if (res.ok) {
+          const data = await res.json();
+          rateField.value = (1 / data.rates.EUR).toFixed(4);
+          updateEtsyPreview();
+          return;
+        }
+      } catch (e) { console.warn('Frankfurter Etsy fallito:', e.name); }
+      
+      // Tentativo 2: Backup API
+      try {
+        const controller2 = new AbortController();
+        const timeout2 = setTimeout(() => controller2.abort(), 4000);
+        const res2 = await fetch(`https://open.er-api.com/v6/latest/USD`, { signal: controller2.signal });
+        clearTimeout(timeout2);
+        if (res2.ok) {
+          const data2 = await res2.json();
+          if (data2.rates && data2.rates.EUR) {
+            rateField.value = (1 / data2.rates.EUR).toFixed(4);
+            showStatus('ℹ️ Cambio Etsy da API backup');
+            updateEtsyPreview();
+            return;
+          }
+        }
+      } catch (e) { console.warn('Backup Etsy fallita:', e.name); }
+      
+      rateField.value = '1.1500';
+      showStatus('⚠️ Cambio Etsy non scaricato — verificare manualmente!', true);
+      updateEtsyPreview();
     }
     
     function autoCalcEtsyFees() {
@@ -2895,23 +2951,39 @@
         return null;
       }
       
+      // Tentativo 1: Frankfurter (storico, data esatta)
       try {
         const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), 3000); // 3 sec timeout
-        
-        const res = await fetch(`https://api.frankfurter.app/${dateStr}?from=USD&to=EUR`, {
-          signal: controller.signal
-        });
+        const timeout = setTimeout(() => controller.abort(), 4000);
+        const res = await fetch(`https://api.frankfurter.app/${dateStr}?from=USD&to=EUR`, { signal: controller.signal });
         clearTimeout(timeout);
-        
-        if (!res.ok) return null;
-        const data = await res.json();
-        const rate = 1 / data.rates.EUR;
-        return { rate, date: data.date };
+        if (res.ok) {
+          const data = await res.json();
+          return { rate: 1 / data.rates.EUR, date: data.date };
+        }
       } catch (e) {
-        console.warn(`Cambio ${year}: usando fallback (${e.name === 'AbortError' ? 'timeout' : e.message})`);
-        return null;
+        console.warn(`Frankfurter ${year} fallito:`, e.name);
       }
+      
+      // Tentativo 2: open.er-api.com (solo cambio corrente, non storico)
+      if (year === currentYear) {
+        try {
+          const controller2 = new AbortController();
+          const timeout2 = setTimeout(() => controller2.abort(), 4000);
+          const res2 = await fetch(`https://open.er-api.com/v6/latest/USD`, { signal: controller2.signal });
+          clearTimeout(timeout2);
+          if (res2.ok) {
+            const data2 = await res2.json();
+            if (data2.rates && data2.rates.EUR) {
+              return { rate: 1 / data2.rates.EUR, date: 'backup' };
+            }
+          }
+        } catch (e) {
+          console.warn(`Backup ${year} fallita:`, e.name);
+        }
+      }
+      
+      return null;
     }
     
     // Scarica tutti i cambi in parallelo (non sequenziale)
