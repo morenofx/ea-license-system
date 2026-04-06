@@ -9,7 +9,7 @@ const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'changeme123';
 
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, DELETE, OPTIONS');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
 
   if (req.method === 'OPTIONS') {
@@ -41,7 +41,7 @@ export default async function handler(req, res) {
 
       // POST - Add new license
       if (req.method === 'POST') {
-        const { account_number, client_name, ea_product, license_type, trial_days } = req.body;
+        const { account_number, client_name, ea_product, license_type } = req.body;
 
         if (!account_number || !client_name || !ea_product) {
           return res.status(400).json({ error: 'Missing required fields' });
@@ -59,24 +59,9 @@ export default async function handler(req, res) {
           return res.status(400).json({ error: 'License already exists' });
         }
 
-        // Prepare license data
-        const licenseData = { 
-          account_number, 
-          client_name, 
-          ea_product, 
-          license_type: license_type || 'paid' 
-        };
-        
-        // Calculate expires_at for trial licenses
-        if (license_type === 'trial' && trial_days) {
-          const expiresAt = new Date();
-          expiresAt.setDate(expiresAt.getDate() + parseInt(trial_days));
-          licenseData.expires_at = expiresAt.toISOString();
-        }
-
         const { data, error } = await supabase
           .from('licenses')
-          .insert([licenseData])
+          .insert([{ account_number, client_name, ea_product, license_type: license_type || 'paid' }])
           .select()
           .single();
 
@@ -228,83 +213,48 @@ export default async function handler(req, res) {
         if (error) throw error;
         return res.status(200).json({ success: true });
       }
-    }
 
-    // ==================== ETSY SALES ====================
-    if (type === 'etsy') {
-      
-      // GET - List Etsy sales
-      if (req.method === 'GET') {
-        const { year } = req.query;
-        
-        let query = supabase
-          .from('etsy_sales')
-          .select('*')
-          .order('sale_date', { ascending: false });
-        
-        if (year) {
-          query = query
-            .gte('sale_date', `${year}-01-01`)
-            .lte('sale_date', `${year}-12-31`);
-        }
+      // PUT - Edit existing sale
+      if (req.method === 'PUT') {
+        const { id, sale_date, ea_product, source, amount_usd, exchange_rate, notes, client_name, account_number } = req.body;
 
-        const { data, error } = await query;
-        if (error) throw error;
-        return res.status(200).json({ sales: data || [] });
-      }
-
-      // POST - Add Etsy sale
-      if (req.method === 'POST') {
-        const { 
-          sale_date, product_name, quantity, sale_price_eur, 
-          etsy_fees_eur, printify_cost_usd, exchange_rate,
-          client_name, notes 
-        } = req.body;
-
-        if (!sale_date || !product_name || !sale_price_eur) {
-          return res.status(400).json({ error: 'Missing required fields' });
-        }
-
-        const printifyEUR = (printify_cost_usd || 0) / (exchange_rate || 1);
-        const margin_eur = sale_price_eur - (etsy_fees_eur || 0) - printifyEUR;
-
-        const saleData = {
-          sale_date,
-          product_name,
-          quantity: quantity || 1,
-          sale_price_eur: parseFloat(sale_price_eur),
-          etsy_fees_eur: parseFloat(etsy_fees_eur) || 0,
-          printify_cost_usd: parseFloat(printify_cost_usd) || 0,
-          exchange_rate: parseFloat(exchange_rate) || 1,
-          margin_eur: Math.round(margin_eur * 100) / 100,
-          client_name: client_name || null,
-          notes: notes || null
-        };
-
-        const { data, error } = await supabase
-          .from('etsy_sales')
-          .insert([saleData])
-          .select()
-          .single();
-
-        if (error) throw error;
-        return res.status(201).json({ success: true, sale: data });
-      }
-
-      // DELETE - Remove Etsy sale
-      if (req.method === 'DELETE') {
-        const { id } = req.body;
         if (!id) {
           return res.status(400).json({ error: 'Missing sale ID' });
         }
 
-        const { error } = await supabase
-          .from('etsy_sales')
-          .delete()
-          .eq('id', id);
+        const amountUSD = parseFloat(amount_usd) || 0;
+        const rate = parseFloat(exchange_rate) || 1;
+        const amount_eur_gross = amountUSD / rate;
+        const amount_eur_net = amount_eur_gross * 0.80;
+
+        const updateData = {};
+        if (sale_date) updateData.sale_date = sale_date;
+        if (ea_product) updateData.ea_product = ea_product;
+        if (source) updateData.source = source;
+        if (amount_usd !== undefined) {
+          updateData.amount_usd = amountUSD;
+          updateData.exchange_rate = rate;
+          updateData.amount_eur_gross = Math.round(amount_eur_gross * 100) / 100;
+          updateData.amount_eur_net = Math.round(amount_eur_net * 100) / 100;
+        }
+        if (exchange_rate !== undefined && amount_usd !== undefined) {
+          updateData.exchange_rate = rate;
+          updateData.amount_eur_gross = Math.round(amount_eur_gross * 100) / 100;
+          updateData.amount_eur_net = Math.round(amount_eur_net * 100) / 100;
+        }
+        if (notes !== undefined) updateData.notes = notes;
+        if (client_name !== undefined) updateData.client_name = client_name;
+        if (account_number !== undefined) updateData.account_number = account_number;
+
+        const { data, error } = await supabase
+          .from('sales')
+          .update(updateData)
+          .eq('id', id)
+          .select()
+          .single();
 
         if (error) throw error;
-        return res.status(200).json({ success: true });
+        return res.status(200).json({ success: true, sale: data });
       }
     }
 
@@ -333,26 +283,11 @@ export default async function handler(req, res) {
 
         const { data: sales } = await salesQuery;
 
-        // Get Etsy sales
-        let etsyQuery = supabase
-          .from('etsy_sales')
-          .select('*')
-          .order('sale_date', { ascending: false });
-        
-        if (year) {
-          etsyQuery = etsyQuery
-            .gte('sale_date', `${year}-01-01`)
-            .lte('sale_date', `${year}-12-31`);
-        }
-
-        const { data: etsySales } = await etsyQuery;
-
         return res.status(200).json({
           exportDate: new Date().toISOString(),
           year: year || 'all',
           licenses: licenses || [],
-          sales: sales || [],
-          etsy_sales: etsySales || []
+          sales: sales || []
         });
       }
     }
@@ -368,7 +303,7 @@ export default async function handler(req, res) {
           .single();
 
         if (error || !data) {
-          return res.status(200).json({ settings: { price_xau: 499, price_btc: 499, price_ghb: 499 } });
+          return res.status(200).json({ settings: { price_xau: 499, price_btc: 499 } });
         }
 
         return res.status(200).json({ settings: JSON.parse(data.value) });
@@ -376,83 +311,17 @@ export default async function handler(req, res) {
 
       // POST - Save settings
       if (req.method === 'POST') {
-        const { price_xau, price_btc, price_ghb } = req.body;
+        const { price_xau, price_btc } = req.body;
 
         const value = JSON.stringify({
           price_xau: price_xau || 499,
-          price_btc: price_btc || 499,
-          price_ghb: price_ghb || 499
+          price_btc: price_btc || 499
         });
 
         // Upsert settings
         const { error } = await supabase
           .from('settings')
           .upsert({ key: 'prices', value: value }, { onConflict: 'key' });
-
-        if (error) throw error;
-        return res.status(200).json({ success: true });
-      }
-    }
-
-    // ==================== ACTIVATION CODES ====================
-    if (type === 'codes') {
-      // GET - List codes
-      if (req.method === 'GET') {
-        const { data, error } = await supabase
-          .from('activation_codes')
-          .select('*')
-          .order('created_at', { ascending: false });
-
-        if (error) throw error;
-        return res.status(200).json(data || []);
-      }
-
-      // POST - Create new code
-      if (req.method === 'POST') {
-        const { product, platform, license_type, trial_days } = req.body;
-
-        if (!product || !license_type) {
-          return res.status(400).json({ error: 'Missing required fields' });
-        }
-
-        // Generate unique code
-        const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-        let code = '';
-        for (let i = 0; i < 8; i++) {
-          code += chars.charAt(Math.floor(Math.random() * chars.length));
-        }
-
-        const codeData = {
-          code: code,
-          product: product,
-          platform: platform || 'MT5',
-          license_type: license_type,
-          trial_days: license_type === 'trial' ? (trial_days || 7) : null,
-          used: false
-        };
-
-        const { data, error } = await supabase
-          .from('activation_codes')
-          .insert([codeData])
-          .select()
-          .single();
-
-        if (error) throw error;
-        return res.status(201).json({ success: true, code: data });
-      }
-
-      // DELETE - Delete code
-      if (req.method === 'DELETE') {
-        const { id } = req.query;
-
-        if (!id) {
-          return res.status(400).json({ error: 'Missing id' });
-        }
-
-        const { error } = await supabase
-          .from('activation_codes')
-          .delete()
-          .eq('id', id);
 
         if (error) throw error;
         return res.status(200).json({ success: true });
