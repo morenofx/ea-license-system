@@ -525,6 +525,10 @@
             <div class="stat-label">Signal Subs</div>
           </div>
           <div class="stat-card">
+            <div class="stat-number" style="color:#f59e0b;" id="statRentals">0</div>
+            <div class="stat-label">📅 Noleggi</div>
+          </div>
+          <div class="stat-card">
             <div class="stat-number green" id="statTotaleEUR">€0</div>
             <div class="stat-label">Totale Netto EUR</div>
           </div>
@@ -575,6 +579,16 @@
               <select id="saleSource" onchange="togglePrivateFields()">
                 <option value="market">MQL5 Market</option>
                 <option value="private">Vendita Privata</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Tipo</label>
+              <select id="saleType">
+                <option value="purchase">💰 Acquisto (Lifetime)</option>
+                <option value="rent_1m">📅 Noleggio 1 mese</option>
+                <option value="rent_3m">📅 Noleggio 3 mesi</option>
+                <option value="rent_6m">📅 Noleggio 6 mesi</option>
+                <option value="rent_12m">📅 Noleggio 12 mesi</option>
               </select>
             </div>
           </div>
@@ -632,6 +646,7 @@
                   <th>Data</th>
                   <th>Prodotto</th>
                   <th>Fonte</th>
+                  <th>Tipo</th>
                   <th class="text-right">USD</th>
                   <th class="text-right">Cambio</th>
                   <th class="text-right">EUR Lordo</th>
@@ -640,7 +655,7 @@
                 </tr>
               </thead>
               <tbody id="salesTable">
-                <tr><td colspan="8" style="text-align:center;color:rgba(255,255,255,0.4);">Caricamento...</td></tr>
+                <tr><td colspan="9" style="text-align:center;color:rgba(255,255,255,0.4);">Caricamento...</td></tr>
               </tbody>
             </table>
           </div>
@@ -1367,20 +1382,32 @@
       const tbody = $('salesTable');
       
       if (sales.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:rgba(255,255,255,0.4);">Nessuna vendita per questo anno</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;color:rgba(255,255,255,0.4);">Nessuna vendita per questo anno</td></tr>';
         updateSalesStats();
         return;
       }
+      
+      const typeLabels = {
+        'purchase': '💰 Acquisto',
+        'rent_1m': '📅 1 mese',
+        'rent_3m': '📅 3 mesi',
+        'rent_6m': '📅 6 mesi',
+        'rent_12m': '📅 12 mesi'
+      };
       
       tbody.innerHTML = sales.map(s => {
         const isSignal = s.ea_product.includes('Signal');
         const productLabel = s.ea_product.replace('_', ' ');
         const productClass = isSignal ? 'product-signal' : 'product-ea';
+        const saleType = s.sale_type || 'purchase';
+        const typeLabel = typeLabels[saleType] || '💰 Acquisto';
+        const typeClass = saleType.startsWith('rent') ? 'type-trial' : 'type-paid';
         return `
         <tr>
           <td>${formatDate(s.sale_date)}</td>
           <td><span class="source-badge ${productClass}">${productLabel}</span></td>
           <td><span class="source-badge source-${s.source}">${s.source === 'market' ? 'Market' : 'Private'}</span></td>
+          <td><span class="source-badge ${typeClass}">${typeLabel}</span></td>
           <td class="text-right mono">$${s.amount_usd.toFixed(2)}</td>
           <td class="text-right mono">${s.exchange_rate.toFixed(4)}</td>
           <td class="text-right mono">€${s.amount_eur_gross.toFixed(2)}</td>
@@ -1398,8 +1425,9 @@
     function updateSalesStats() {
       const market = sales.filter(s => s.source === 'market');
       const priv = sales.filter(s => s.source === 'private');
-      const eaSales = sales.filter(s => s.ea_product.includes('AutoTrader'));
+      const eaSales = sales.filter(s => s.ea_product.includes('AutoTrader') || s.ea_product.includes('Hydra'));
       const signalSales = sales.filter(s => s.ea_product.includes('Signal'));
+      const rentals = sales.filter(s => (s.sale_type || '').startsWith('rent'));
       const totalNet = sales.reduce((sum, s) => sum + s.amount_eur_net, 0);
       
       $('statTotaleSales').textContent = sales.length;
@@ -1407,6 +1435,7 @@
       $('statPrivate').textContent = priv.length;
       $('statEA').textContent = eaSales.length;
       $('statSignal').textContent = signalSales.length;
+      $('statRentals').textContent = rentals.length;
       $('statTotaleEUR').textContent = '€' + totalNet.toFixed(0);
     }
     
@@ -1469,6 +1498,9 @@
         $('saleAccountNumber').value = sale.account_number || '';
       }
       
+      // Tipo vendita
+      $('saleType').value = sale.sale_type || 'purchase';
+      
       updateSalePreview();
       
       // Scroll al form
@@ -1528,6 +1560,7 @@
         sale_date: $('saleDate').value,
         ea_product: product,
         source: source,
+        sale_type: $('saleType').value,
         amount_usd: $('saleAmountUSD').value,
         exchange_rate: $('saleExchangeRate').value,
         notes: $('saleNotes').value
