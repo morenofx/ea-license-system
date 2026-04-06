@@ -117,6 +117,7 @@ export default async function handler(req, res) {
           sale_date, 
           ea_product, 
           source, 
+          sale_type,
           amount_usd, 
           exchange_rate,
           client_name,
@@ -150,6 +151,7 @@ export default async function handler(req, res) {
           sale_date,
           ea_product,
           source,
+          sale_type: sale_type || 'purchase',
           amount_usd: amountUSD,
           exchange_rate: rate,
           amount_eur_gross: Math.round(amount_eur_gross * 100) / 100,
@@ -216,7 +218,7 @@ export default async function handler(req, res) {
 
       // PUT - Edit existing sale
       if (req.method === 'PUT') {
-        const { id, sale_date, ea_product, source, amount_usd, exchange_rate, notes, client_name, account_number } = req.body;
+        const { id, sale_date, ea_product, source, sale_type, amount_usd, exchange_rate, notes, client_name, account_number } = req.body;
 
         if (!id) {
           return res.status(400).json({ error: 'Missing sale ID' });
@@ -231,6 +233,7 @@ export default async function handler(req, res) {
         if (sale_date) updateData.sale_date = sale_date;
         if (ea_product) updateData.ea_product = ea_product;
         if (source) updateData.source = source;
+        if (sale_type) updateData.sale_type = sale_type;
         if (amount_usd !== undefined) {
           updateData.amount_usd = amountUSD;
           updateData.exchange_rate = rate;
